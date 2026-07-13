@@ -161,31 +161,45 @@
    (미설정 시 자동으로 로컬 단일기기 모드로 동작)
    값 위치: Supabase 대시보드 → Settings → API
    ============================================================ */
-const SUPABASE_URL  = "PROJECT_URL";   // 예: https://abcd1234.supabase.co
-const SUPABASE_ANON = "ANON_KEY";      // 예: eyJhbGciOi...
+const SUPABASE_URL  = "https://ftfxnfimfiwkgcejgeuq.supabase.co";   // base URL만 (뒤에 /rest/v1/ 붙이지 말 것)
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0ZnhuZmltZml3a2djZWpnZXVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5MjExODcsImV4cCI6MjA5OTQ5NzE4N30.bwgRjmIYLG8Xxvra7_FZS0j8SqAPaAtqzBYfvNKYbpg";
 
-const SUPA={sb:null,room:null,connected:false};
+const SUPA={sb:null,room:null,connected:false,reason:null};
+function teamKey(){return ({'팀 1':'team1','팀 2':'team2','팀 3':'team3'})[state.user.team]||('team_'+String(state.user.team||'x').replace(/[^A-Za-z0-9]+/g,'_'));}
 const SUPA_ENABLED = /^https:\/\/.+\.supabase\.co/.test(SUPABASE_URL) && SUPABASE_ANON.length>20;
 const SHARED=['members','clusters','themeNotes','themeVotes','selectedTheme','subtopic','subReason','teamName','teamTopic','ideaMemo','checks'];
 let applyingRemote=false, syncT=null;
 function serialize(){const o={};SHARED.forEach(k=>o[k]=state[k]);return JSON.parse(JSON.stringify(o));}
 function applyRemote(data){if(!data)return;applyingRemote=true;SHARED.forEach(k=>{if(data[k]!==undefined)state[k]=data[k];});if(state.loggedIn)render();applyingRemote=false;}
 function scheduleSync(){if(!SUPA.connected||applyingRemote)return;clearTimeout(syncT);syncT=setTimeout(pushState,300);}
-async function pushState(){try{if(!SUPA.connected)return;const s=serialize();
-  SUPA.room&&SUPA.room.send({type:'broadcast',event:'state',payload:{state:s}});
-  await SUPA.sb.from('workspaces').upsert({team_code:state.user.team,state:s});}catch(e){console.warn('sync',e);}}
+async function pushState(){try{if(!SUPA.connected)return;const s=serialize();const key=teamKey();
+  if(SUPA.room)await SUPA.room.send({type:'broadcast',event:'state',payload:{state:s}});
+  const {error}=await SUPA.sb.from('workspaces').upsert({team_code:key,state:s});
+  if(error)console.warn('[sync] DB 저장 실패(RLS/테이블 확인):',error.message);
+}catch(e){console.warn('[sync]',e);}}
 async function joinRoom(){
-  if(!SUPA_ENABLED||typeof window.supabase==='undefined')return {ok:false,reason:'local'};
+  if(!SUPA_ENABLED)return {ok:false,reason:'local'};
+  if(typeof window.supabase==='undefined')return {ok:false,reason:'lib'};
   try{
     SUPA.sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
-    // 기존 상태 로드
-    const {data:row}=await SUPA.sb.from('workspaces').select('state').eq('team_code',state.user.team).maybeSingle();
-    if(row&&row.state)applyRemote(row.state);
-    // 팀 코드로 실시간 채널 입장
-    SUPA.room=SUPA.sb.channel('room:'+state.user.team,{config:{broadcast:{self:false}}});
-    SUPA.room.on('broadcast',{event:'state'},({payload})=>applyRemote(payload.state)).subscribe();
-    SUPA.connected=true; return {ok:true};
-  }catch(e){console.warn('join',e);return {ok:false,reason:'error'};}
+    const key=teamKey();
+    // 기존 상태 로드 (실패해도 진행)
+    try{const {data:row,error}=await SUPA.sb.from('workspaces').select('state').eq('team_code',key).maybeSingle();
+      if(error)console.warn('[join] 상태 로드 실패(테이블/RLS 확인):',error.message);
+      else if(row&&row.state)applyRemote(row.state);}catch(e){console.warn('[join] load',e);}
+    // 실시간 채널 (ascii 안전 키) — 구독 확정 시에만 connected
+    return await new Promise((resolve)=>{
+      let done=false;
+      SUPA.room=SUPA.sb.channel('room-'+key,{config:{broadcast:{self:false}}});
+      SUPA.room.on('broadcast',{event:'state'},({payload})=>applyRemote(payload.state))
+        .subscribe((status,err)=>{
+          console.log('[join] realtime status:',status,err||'');
+          if(status==='SUBSCRIBED'){SUPA.connected=true;if(state.loggedIn)renderUserbar();if(!done){done=true;resolve({ok:true});}}
+          else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED'){SUPA.reason='realtime';if(!done){done=true;resolve({ok:false,reason:'realtime'});}}
+        });
+      setTimeout(()=>{if(!done){done=true;resolve({ok:SUPA.connected,reason:SUPA.connected?null:'timeout'});}},9000);
+    });
+  }catch(e){console.warn('[join]',e);return {ok:false,reason:'error'};}
 }
 
 /* ===== data ===== */
@@ -291,8 +305,10 @@ function render(){
   [renderIntro,renderStep1,renderStep2,renderStep3,renderStep4,renderStep5,renderResult][state.step]();
 }
 function renderUserbar(){
+  const stat=SUPA.connected?'🟢 실시간 연결됨 · 팀원과 동기화 중'
+    :(SUPA_ENABLED?('🔴 실시간 연결 실패'+(SUPA.reason?'('+SUPA.reason+')':'')+' · 로컬로 진행'):'· 로컬 모드');
   $("#userbar").innerHTML=`<span class="who">👤 <b>${esc(state.user.name)}</b> · ${esc(state.user.team)}</span>
-    <span class="livehint">${SUPA.connected?'🟢 실시간 연결됨 · 팀원과 동기화 중':'· 로컬 모드'}</span>
+    <span class="livehint">${stat}</span>
     <button class="out" onclick="logout()">나가기</button>`;
 }
 function renderStepper(){const sp=$("#stepper");sp.innerHTML="";STEPS.forEach((st,i)=>{const b=document.createElement("button");
@@ -323,12 +339,10 @@ async function doLogin(){
   if(!state.user.team)state.user.team="팀 1";
   state.user.name=nm;
   if(SUPA_ENABLED){
-    const btn=$("#enterBtn");if(btn){btn.textContent="입장 중…";btn.disabled=true;}
-    const r=await joinRoom();
-    if(!r.ok&&r.reason!=='local'){
-      const note=$("#loginNote");if(note){note.textContent="연결 실패 — 네트워크나 설정값을 확인하고 다시 시도하세요.";note.style.color="#c0392b";}
-      if(btn){btn.textContent="워크스페이스 입장 →";btn.disabled=false;}return;
-    }
+    const btn=$("#enterBtn");if(btn){btn.textContent="연결 중…";btn.disabled=true;}
+    const r=await joinRoom();SUPA.reason=r.reason||null;
+    if(btn){btn.textContent="워크스페이스 입장 →";btn.disabled=false;}
+    // 실패해도 로컬로 진행 — 상태는 상단바에 표시
   }
   state.loggedIn=true;
   const empty=state.members.find(x=>!x.name);
