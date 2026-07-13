@@ -161,8 +161,8 @@
    (미설정 시 자동으로 로컬 단일기기 모드로 동작)
    값 위치: Supabase 대시보드 → Settings → API
    ============================================================ */
-const SUPABASE_URL  = "https://ftfxnfimfiwkgcejgeuq.supabase.co/rest/v1/"; SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0ZnhuZmltZml3a2djZWpnZXVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5MjExODcsImV4cCI6MjA5OTQ5NzE4N30.bwgRjmIYLG8Xxvra7_FZS0j8SqAPaAtqzBYfvNKYbpg";
-
+const SUPABASE_URL  = "PROJECT_URL";   // 예: https://abcd1234.supabase.co
+const SUPABASE_ANON = "ANON_KEY";      // 예: eyJhbGciOi...
 
 const SUPA={sb:null,room:null,connected:false};
 const SUPA_ENABLED = /^https:\/\/.+\.supabase\.co/.test(SUPABASE_URL) && SUPABASE_ANON.length>20;
@@ -521,7 +521,7 @@ function renderResult(){
       <table class="roletbl"><thead><tr><th style="width:22%">이름</th><th>맡을 부분</th><th style="width:34%">원래 아이디어와의 연결</th></tr></thead>
       <tbody>${state.members.map(mm=>`<tr><td><b>${esc(mm.name||'—')}</b></td><td>${esc(mm.rolePart||'—')}</td><td>${esc(mm.roleLink||'—')}</td></tr>`).join("")}</tbody></table></div>
     <div class="navbtns"><button class="btn ghost" onclick="go(-1)">← 이전</button>
-      <div style="display:flex;gap:10px"><button class="btn ghost" onclick="copySummary()" id="copybtn">📋 요약 복사</button><button class="btn tan" onclick="savePDF()" id="pdfbtn">📄 PDF 저장</button></div></div></div>`;
+      <div style="display:flex;gap:10px"><button class="btn ghost" onclick="copySummary()" id="copybtn">📋 요약 복사</button><button class="btn tan" onclick="savePDF()" id="pdfbtn">📄 전체 과정 PDF 저장</button></div></div></div>`;
   renderChecks();renderIdeaSugg();
 }
 function runAiIdeas(){state.aiIdeaList=aiIdeas(state);renderIdeaSugg();}
@@ -534,29 +534,81 @@ function addIdea(i){const t=state.aiIdeaList[i];state.ideaMemo=(state.ideaMemo?s
 function renderChecks(){const box=$("#checks");box.innerHTML="";CHECKS.forEach((c,i)=>{const d=document.createElement("div");
   d.className="check"+(state.checks[i]?" on":"");d.innerHTML=`<div class="box">${state.checks[i]?"✓":""}</div><span>${c}</span>`;
   d.onclick=()=>{state.checks[i]=!state.checks[i];renderChecks();};box.appendChild(d);});}
-function copySummary(){const th=state.selectedTheme||"—";const kw=state.clusters.filter(c=>c.label).map(c=>c.label).join(" · ")||"—";
-  let txt=`[역방향 팀빌딩 결과] ${state.teamName||''} (${state.user.team})\n`;
-  txt+=`흐름: 세부 → ${kw} → 대주제 ${th} → 소주제 ${state.subtopic||'—'} → 팀 주제\n\n팀 주제: ${state.teamTopic||'—'}\n소주제 이유: ${state.subReason||'—'}\n\n아이디어:\n${state.ideaMemo||'—'}\n\n역할:\n`;
-  state.members.forEach((m,i)=>{txt+=`- ${m.name||('팀원'+(i+1))}: ${m.rolePart||'—'} (${m.roleLink||'—'})\n`});
-  navigator.clipboard.writeText(txt).then(()=>{const b=$("#copybtn");b.textContent="✓ 복사됨";setTimeout(()=>b.textContent="📋 요약 복사",1500);}).catch(()=>{});}
+function copySummary(){const th=state.selectedTheme||"—";const kw=state.clusters.filter(c=>c.label).map(c=>c.label).join(" · ")||"—";const nm=(m,i)=>m.name||('팀원'+(i+1));
+  let t=`[역방향 팀빌딩 전체 과정] ${state.teamName||''} (${state.user.team})\n`;
+  t+=`흐름: 세부 → ${kw} → 대주제 ${th} → 소주제 ${state.subtopic||'—'} → 팀 주제\n\n`;
+  t+=`■ STEP1 개인 문제·아이디어\n`;state.members.forEach((m,i)=>{t+=`- ${nm(m,i)} | 문제: ${m.problem||'—'} | 아이디어: ${m.idea||'—'}\n`;});
+  t+=`\n■ STEP2 키워드\n`;state.members.forEach((m,i)=>{t+=`- ${nm(m,i)}: ${(m.keywords||[]).join(', ')||'—'}\n`;});
+  const cl=state.clusters.filter(c=>c.label);if(cl.length){t+=`공통 키워드: `+cl.map(c=>c.label+(c.members?`(${c.members})`:'')).join(' / ')+`\n`;}
+  t+=`\n■ STEP3 대주제 투표\n`;THEMES.forEach(x=>{t+=`- ${x.key}: ${state.themeVotes[x.key]||0}표${state.selectedTheme===x.key?' ← 선정':''}\n`;});
+  t+=`\n■ STEP4 소주제: ${state.subtopic||'—'} (이유: ${state.subReason||'—'})\n`;
+  t+=`\n■ STEP5 팀명: ${state.teamName||'—'} / 팀 주제: ${state.teamTopic||'—'}\n역할:\n`;state.members.forEach((m,i)=>{t+=`- ${nm(m,i)}: ${m.rolePart||'—'} (${m.roleLink||'—'})\n`;});
+  t+=`\n■ 아이디어\n${state.ideaMemo||'—'}\n\n■ 체크리스트\n`;CHECKS.forEach((c,i)=>{t+=`${state.checks[i]?'[v]':'[ ]'} ${c}\n`;});
+  navigator.clipboard.writeText(t).then(()=>{const b=$("#copybtn");b.textContent="✓ 복사됨";setTimeout(()=>b.textContent="📋 요약 복사",1500);}).catch(()=>{});}
 
-/* ===== PDF 저장 ===== */
+/* ===== 전체 과정 리포트 HTML ===== */
+function reportHTML(){
+  const th=state.selectedTheme||'—';
+  const kw=state.clusters.filter(c=>c.label).map(c=>c.label).join(' · ')||'—';
+  const H=(t)=>`<div style="font-size:15px;font-weight:700;color:#5A4A42;margin:18px 0 6px;border-bottom:2px solid #FEE500;padding-bottom:4px">${t}</div>`;
+  const nm=(m,i)=>esc(m.name||('팀원'+(i+1)));
+  let h=`<div style="font-family:'Malgun Gothic','Noto Sans KR',sans-serif;color:#2E2622;line-height:1.6">`;
+  h+=`<div style="background:#3A2E28;color:#fff;border-radius:10px;padding:16px 18px;margin-bottom:8px">
+      <div style="color:#E8712B;font-weight:700;font-size:13px">역방향 팀빌딩 전체 과정 · ${esc(state.teamName||'(팀명 미정)')} · ${esc(state.user.team||'')}</div>
+      <div style="font-size:12px;color:#E4D3BE;margin:6px 0">세부내용 → ${esc(kw)} → 대주제 ${esc(th)} → 소주제 ${esc(state.subtopic||'—')} → 팀 주제</div>
+      <div style="font-size:18px;font-weight:700">${esc(state.teamTopic||'—')}</div></div>`;
+  h+=H('STEP 1 · 개인 문제와 아이디어');
+  h+=`<table style="width:100%;border-collapse:collapse;font-size:12px"><tr style="background:#5A4A42;color:#fff"><td style="padding:7px;width:16%">이름</td><td style="padding:7px">해결하고 싶은 문제</td><td style="padding:7px">해결 아이디어</td></tr>`;
+  state.members.forEach((m,i)=>{h+=`<tr><td style="border:1px solid #EADFC4;padding:7px;font-weight:700">${nm(m,i)}</td><td style="border:1px solid #EADFC4;padding:7px">${esc(m.problem||'—')}</td><td style="border:1px solid #EADFC4;padding:7px">${esc(m.idea||'—')}</td></tr>`;});
+  h+=`</table>`;
+  h+=H('STEP 2 · 키워드 & 공통 키워드');
+  h+=`<div style="font-size:12px">`;
+  state.members.forEach((m,i)=>{h+=`<div style="margin:2px 0"><b>${nm(m,i)}</b>: ${esc((m.keywords||[]).join(', ')||'—')}</div>`;});
+  const cl=state.clusters.filter(c=>c.label);
+  if(cl.length){h+=`<div style="margin-top:8px;font-weight:700">공통 키워드 묶음</div>`;cl.forEach(c=>{h+=`<div style="margin:2px 0">• <b>${esc(c.label)}</b>${c.members?` <span style="color:#8A7F72">(${esc(c.members)})</span>`:''}</div>`;});}
+  h+=`</div>`;
+  h+=H('STEP 3 · 대주제 선정 (투표 결과)');
+  h+=`<div style="font-size:12px">`;
+  THEMES.forEach(t=>{const sel=state.selectedTheme===t.key;h+=`<div style="margin:3px 0">${sel?'✅ ':'▫️ '}<b>${esc(t.key)}</b> — ${state.themeVotes[t.key]||0}표${sel?' <span style="color:#E8712B;font-weight:700">← 선정</span>':''}</div>`;});
+  h+=`</div>`;
+  h+=H('STEP 4 · 소주제');
+  h+=`<div style="font-size:12px"><b style="color:#CE5E1E">${esc(state.subtopic||'—')}</b>${state.subReason?`<div style="color:#8A7F72;margin-top:3px">이유: ${esc(state.subReason)}</div>`:''}</div>`;
+  h+=H('STEP 5 · 팀명 · 팀 주제 · 역할 분배');
+  h+=`<div style="font-size:12px;margin-bottom:5px">팀명 <b>${esc(state.teamName||'—')}</b> · 팀 주제 <b>${esc(state.teamTopic||'—')}</b></div>`;
+  h+=`<table style="width:100%;border-collapse:collapse;font-size:12px"><tr style="background:#8A7A6E;color:#fff"><td style="padding:7px;width:16%">이름</td><td style="padding:7px">맡을 부분</td><td style="padding:7px">아이디어 연결</td></tr>`;
+  state.members.forEach((m,i)=>{h+=`<tr><td style="border:1px solid #EADFC4;padding:7px;font-weight:700">${nm(m,i)}</td><td style="border:1px solid #EADFC4;padding:7px">${esc(m.rolePart||'—')}</td><td style="border:1px solid #EADFC4;padding:7px">${esc(m.roleLink||'—')}</td></tr>`;});
+  h+=`</table>`;
+  h+=H('아이디어 도출');
+  h+=`<div style="font-size:12px;white-space:pre-wrap">${esc(state.ideaMemo||'—')}</div>`;
+  h+=H('확정 체크리스트');
+  h+=`<div style="font-size:12px">`;CHECKS.forEach((c,i)=>{h+=`<div style="margin:2px 0">${state.checks[i]?'☑':'☐'} ${esc(c)}</div>`;});h+=`</div>`;
+  h+=`</div>`;
+  return h;
+}
+/* ===== 전체 과정 PDF 저장 ===== */
 async function savePDF(){
-  const btn=$("#pdfbtn");const el=$("#view .panel");if(!el)return;
-  const fname=(state.teamName||state.user.team||'팀')+'_역방향팀빌딩_결과.pdf';
-  if(typeof window.html2canvas==='function'&&window.jspdf&&window.jspdf.jsPDF){
-    try{
+  const btn=$("#pdfbtn");
+  const fname=(state.teamName||state.user.team||'팀')+'_역방향팀빌딩_전체과정.pdf';
+  const wrap=document.createElement('div');
+  wrap.style.cssText='position:absolute;left:-99999px;top:0;width:760px;background:#fff;padding:30px;box-sizing:border-box';
+  wrap.innerHTML=reportHTML();document.body.appendChild(wrap);
+  try{
+    if(typeof window.html2canvas==='function'&&window.jspdf&&window.jspdf.jsPDF){
       if(btn){btn.textContent="저장 중…";btn.disabled=true;}
-      const canvas=await window.html2canvas(el,{scale:2,backgroundColor:'#ffffff',useCORS:true});
+      const canvas=await window.html2canvas(wrap,{scale:2,backgroundColor:'#ffffff'});
       const img=canvas.toDataURL('image/png');
       const {jsPDF}=window.jspdf;const pdf=new jsPDF('p','mm','a4');
       const pw=210, ph=canvas.height*pw/canvas.width, pageH=297;
       if(ph<=pageH){pdf.addImage(img,'PNG',0,0,pw,ph);}
       else{let left=ph,pos=0;while(left>0){pdf.addImage(img,'PNG',0,pos,pw,ph);left-=pageH;pos-=pageH;if(left>0)pdf.addPage();}}
       pdf.save(fname);
-    }catch(e){console.warn('pdf',e);window.print();}
-    finally{if(btn){btn.textContent="📄 PDF 저장";btn.disabled=false;}}
-  } else { window.print(); }
+    } else {
+      const w=window.open('','_blank');
+      if(w){w.document.write('<html><head><meta charset="utf-8"><title>'+fname+'</title></head><body>'+reportHTML()+'</body></html>');w.document.close();w.focus();setTimeout(()=>w.print(),300);}
+      else window.print();
+    }
+  }catch(e){console.warn('pdf',e);window.print();}
+  finally{document.body.removeChild(wrap);if(btn){btn.textContent="📄 전체 과정 PDF 저장";btn.disabled=false;}}
 }
 /* ===== 실시간 동기화 트리거(위임 리스너) ===== */
 document.addEventListener('input',scheduleSync,true);
