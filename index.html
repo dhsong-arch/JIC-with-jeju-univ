@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>역방향 팀빌딩 워크숍</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{
+    --ink:#2E2622; --ocean:#5A4A42; --ocean-dk:#3A2E28; --teal:#8A7A6E;
+    --sea:#FFF8E1; --sea2:#FBEFD0; --tan:#E8712B; --tan-dk:#CE5E1E;
+    --muted:#8A7F72; --line:#EADFC4; --white:#fff; --violet:#3B7DD8;
+    --kakao:#FEE500; --kakaod:#F5D800; --red:#E8452F; --green:#6FA84B;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"Malgun Gothic","Noto Sans KR","Apple SD Gothic Neo",system-ui,sans-serif;
+    color:var(--ink);background:var(--sea);line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 20px 80px}
+  header{background:var(--kakao);color:var(--ink);padding:24px 0 20px;position:relative;overflow:hidden}
+  header .wrap{position:relative;z-index:2;padding-bottom:0}
+  .kicker{color:var(--tan-dk);font-weight:700;letter-spacing:2px;font-size:13px}
+  h1{font-size:28px;margin:4px 0 8px;color:var(--ink)}
+  .flowline{color:#6b5c50;font-size:14px}
+  .flowline b{color:var(--tan-dk)}
+  .meta{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
+  .meta span{background:#fff;border:1px solid var(--line);color:var(--ink);border-radius:20px;padding:5px 14px;font-size:13px;font-weight:700}
+  /* userbar */
+  #userbar{display:flex;align-items:center;gap:10px;margin-top:16px;flex-wrap:wrap}
+  #userbar .who{background:var(--ocean);color:#fff;border-radius:22px;padding:7px 16px;font-size:14px;font-weight:700}
+  #userbar .who b{color:var(--kakao)}
+  #userbar .out{margin-left:auto;background:#fff;border:1px solid var(--line);color:var(--ocean);border-radius:20px;
+    padding:6px 14px;font-size:12.5px;cursor:pointer;font-family:inherit;font-weight:700}
+  #userbar .livehint{color:#7a6d5e;font-size:12px}
+  .stepper{display:flex;gap:6px;margin:22px 0 8px;flex-wrap:wrap}
+  .stepper button{flex:1;min-width:92px;border:none;cursor:pointer;background:#fff;border:1px solid var(--line);
+    border-radius:10px;padding:9px 6px;font-size:12.5px;font-weight:700;color:var(--muted);transition:.15s;font-family:inherit}
+  .stepper button .n{display:inline-flex;width:20px;height:20px;border-radius:50%;background:var(--sea2);color:var(--ocean);
+    align-items:center;justify-content:center;font-size:11px;margin-right:5px}
+  .stepper button.active{background:var(--ocean);color:#fff;border-color:var(--ocean)}
+  .stepper button.active .n{background:var(--tan);color:#fff}
+  .stepper button.done .n{background:var(--teal);color:#fff}
+  .panel{background:#fff;border:1px solid var(--line);border-radius:16px;padding:26px;margin-top:14px;box-shadow:0 8px 24px rgba(10,59,64,.06)}
+  .phead{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+  .ptitle{display:flex;align-items:center;gap:12px}
+  .ptitle .badge{width:44px;height:44px;border-radius:50%;background:var(--tan);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;flex-shrink:0}
+  .ptitle .sub{font-size:12px;font-weight:700;color:var(--teal);letter-spacing:1px}
+  .ptitle h2{font-size:22px;line-height:1.2}
+  .timer{display:flex;align-items:center;gap:8px;background:var(--sea);border-radius:12px;padding:6px 10px}
+  .timer .t{font-variant-numeric:tabular-nums;font-weight:700;font-size:18px;color:var(--ocean);min-width:56px;text-align:center}
+  .timer button{border:none;background:var(--ocean);color:#fff;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:14px;font-family:inherit}
+  .timer button.reset{background:var(--sea2);color:var(--ocean)}
+  .prompt{background:#FBEBD9;border-radius:10px;padding:13px 16px;margin:16px 0;font-size:14.5px}
+  .prompt b{color:var(--tan-dk)}
+  .tip{font-size:12.5px;color:var(--muted);font-style:italic;margin-top:14px}
+  .tip b{color:var(--teal);font-style:normal}
+  label.fl{display:block;font-size:12px;font-weight:700;color:var(--teal);margin:0 0 5px}
+  input[type=text],textarea,select{width:100%;border:1.5px solid var(--line);border-radius:9px;padding:10px 12px;font-family:inherit;font-size:14px;color:var(--ink);resize:vertical;background:#fff}
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--teal)}
+  textarea{min-height:60px}
+  .member{border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px;background:#fff}
+  .member.me{border-color:var(--tan);background:#FFFaf4}
+  .member .mtop{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .member .mnum{width:30px;height:30px;border-radius:50%;background:var(--ocean);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0}
+  .member .mtop input{flex:1;font-weight:700}
+  .member .mebadge{background:var(--tan);color:#fff;font-size:11px;font-weight:700;border-radius:12px;padding:3px 10px}
+  .member .del{border:none;background:none;color:var(--muted);cursor:pointer;font-size:20px;padding:0 6px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:720px){.grid2{grid-template-columns:1fr}}
+  .btn{border:none;border-radius:10px;padding:11px 20px;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit}
+  .btn.primary{background:var(--ocean);color:#fff}
+  .btn.ghost{background:var(--sea2);color:var(--ocean)}
+  .btn.tan{background:var(--tan);color:#fff}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .navbtns{display:flex;justify-content:space-between;margin-top:22px;gap:10px}
+  .addbtn{background:var(--sea);border:1.5px dashed var(--teal);color:var(--ocean);border-radius:10px;padding:11px;width:100%;font-weight:700;cursor:pointer;font-size:14px;font-family:inherit}
+  .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}
+  .chip{background:var(--sea2);color:var(--ocean);border-radius:20px;padding:5px 13px;font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid transparent;user-select:none}
+  .chip.sel{background:var(--tan);color:#fff}
+  .chip.ai{background:#fff;border:1.5px dashed var(--violet);color:var(--violet)}
+  .chip.ai:hover{background:#F3F0FA}
+  .idea-ref{background:var(--sea);border-radius:9px;padding:10px 12px;font-size:13px;color:var(--muted);margin:6px 0 8px}
+  .idea-ref b{color:var(--ink)}
+  .aibtn{background:#F3F0FA;border:1.5px solid var(--violet);color:var(--violet);border-radius:20px;padding:6px 14px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px}
+  .aibtn:hover{background:#E9E4F5}
+  .ailabel{font-size:11.5px;color:var(--violet);font-weight:700;margin:8px 0 2px;display:flex;align-items:center;gap:5px}
+  .aibanner{background:#F3F0FA;border:1px solid #d9d1ee;border-radius:10px;padding:12px 15px;margin:10px 0;font-size:13.5px;color:#403266}
+  .aibanner b{color:var(--violet)}
+  .aicard{border:1.5px solid var(--violet);border-radius:11px;padding:12px 14px;margin-bottom:8px;background:#FaF9FE;display:flex;align-items:center;gap:12px}
+  .aicard .rank{width:26px;height:26px;border-radius:50%;background:var(--violet);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0}
+  .aicard .body{flex:1}
+  .aicard .body .lab{font-weight:700}
+  .aicard .body .mem{font-size:12px;color:var(--muted)}
+  .themecard{border:1.5px solid var(--line);border-radius:13px;padding:16px;margin-bottom:12px;transition:.15s}
+  .themecard.on{border-color:var(--tan);background:#FFF7EF;box-shadow:0 4px 14px rgba(242,145,61,.18)}
+  .themecard.rec{box-shadow:0 0 0 2px var(--violet) inset}
+  .themecard .th{display:flex;align-items:center;gap:12px;margin-bottom:8px;cursor:pointer}
+  .themecard .tnum{width:38px;height:38px;border-radius:50%;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700}
+  .themecard h3{font-size:19px}
+  .themecard .sub-chips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 10px}
+  .themecard .sub-chips span{background:var(--sea2);color:var(--ocean);border-radius:16px;padding:3px 11px;font-size:12px;font-weight:700}
+  .voterow{display:flex;align-items:center;gap:12px;margin-top:10px;flex-wrap:wrap}
+  .voterow .lbl{font-size:12px;font-weight:700;color:var(--muted)}
+  .vote{display:flex;align-items:center;gap:8px}
+  .vote button{width:30px;height:30px;border-radius:8px;border:none;background:var(--sea2);color:var(--ocean);font-size:16px;font-weight:700;cursor:pointer;font-family:inherit}
+  .vote .cnt{min-width:26px;text-align:center;font-weight:700;font-size:17px;color:var(--ocean)}
+  .dots{color:var(--tan);letter-spacing:2px;font-size:15px}
+  .tag{display:inline-block;color:#fff;font-size:11px;font-weight:700;border-radius:12px;padding:2px 10px;margin-left:6px}
+  .tag.win{background:var(--tan)} .tag.ai{background:var(--violet)}
+  .result-hero{background:var(--ocean-dk);color:#fff;border-radius:14px;padding:22px;margin-bottom:16px}
+  .result-hero .teamname{color:var(--tan);font-weight:700;font-size:14px;margin-bottom:6px}
+  .result-hero .path{color:#E4D3BE;font-size:13px;margin-bottom:10px}
+  .result-hero .path b{color:var(--tan)}
+  .result-hero h2{font-size:24px;line-height:1.3}
+  .rgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:720px){.rgrid{grid-template-columns:1fr}}
+  .rbox{border:1px solid var(--line);border-radius:12px;padding:16px}
+  .rbox h4{font-size:14px;color:var(--teal);margin-bottom:8px}
+  .pitch{font-size:15px;line-height:1.9}
+  .pitch b{color:var(--tan-dk)}
+  .check{display:flex;align-items:center;gap:10px;padding:7px 0;cursor:pointer}
+  .check .box{width:24px;height:24px;border-radius:6px;border:2px solid var(--teal);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:700;color:#fff;font-size:14px}
+  .check.on .box{background:var(--teal)}
+  .roletbl{width:100%;border-collapse:collapse;margin-top:6px;font-size:13px}
+  .roletbl th{background:var(--teal);color:#fff;padding:8px;text-align:left;font-size:12.5px}
+  .roletbl td{border:1px solid var(--line);padding:8px;vertical-align:top}
+  .hidden{display:none}
+  .miniflow{display:flex;flex-direction:column;gap:0;margin-top:6px}
+  .miniflow .mf{border-radius:8px;padding:8px 12px;font-size:13px;font-weight:700;color:#fff}
+  .miniflow .arw{text-align:center;color:var(--tan);font-size:11px;line-height:1.4}
+  /* login */
+  .login{max-width:460px;margin:26px auto 0}
+  .login .lcard{background:#fff;border:1px solid var(--line);border-radius:18px;padding:30px;box-shadow:0 12px 30px rgba(10,59,64,.1)}
+  .login h2{font-size:23px;margin-bottom:4px}
+  .login p.desc{color:var(--muted);font-size:13.5px;margin-bottom:20px}
+  .teamsel{display:flex;gap:8px;margin-top:6px}
+  .teamsel button{flex:1;border:1.5px solid var(--line);background:#fff;border-radius:10px;padding:12px;font-weight:700;color:var(--muted);cursor:pointer;font-family:inherit;font-size:14px}
+  .teamsel button.on{background:var(--ocean);color:#fff;border-color:var(--ocean)}
+  .login .note{font-size:12px;color:var(--muted);margin-top:16px;background:var(--sea);border-radius:9px;padding:11px 13px}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="kicker">2026 카카오 제주 임팩트 챌린지 · 역방향 팀빌딩</div>
+    <h1>개인의 문제에서 팀의 주제로</h1>
+    <div class="flowline">세부내용 → 소주제(키워드) → <b>대주제</b> → 소주제 → 세부내용</div>
+    <div class="meta"><span>90분</span><span>4명 × 3팀</span><span>현장 진행용</span></div>
+    <div id="userbar" class="hidden"></div>
+  </div>
+</header>
+<div class="wrap">
+  <div class="stepper hidden" id="stepper"></div>
+  <div id="view"></div>
+</div>
+
+<script>
+/* ============================================================
+   Supabase 설정 — 아래 두 값만 채우면 실시간 동시편집이 켜집니다.
+   (미설정 시 자동으로 로컬 단일기기 모드로 동작)
+   값 위치: Supabase 대시보드 → Settings → API
+   ============================================================ */
+const SUPABASE_URL  = "https://ftfxnfimfiwkgcejgeuq.supabase.co/rest/v1/"; SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0ZnhuZmltZml3a2djZWpnZXVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5MjExODcsImV4cCI6MjA5OTQ5NzE4N30.bwgRjmIYLG8Xxvra7_FZS0j8SqAPaAtqzBYfvNKYbpg";
+
+
+const SUPA={sb:null,room:null,connected:false};
+const SUPA_ENABLED = /^https:\/\/.+\.supabase\.co/.test(SUPABASE_URL) && SUPABASE_ANON.length>20;
+const SHARED=['members','clusters','themeNotes','themeVotes','selectedTheme','subtopic','subReason','teamName','teamTopic','ideaMemo','checks'];
+let applyingRemote=false, syncT=null;
+function serialize(){const o={};SHARED.forEach(k=>o[k]=state[k]);return JSON.parse(JSON.stringify(o));}
+function applyRemote(data){if(!data)return;applyingRemote=true;SHARED.forEach(k=>{if(data[k]!==undefined)state[k]=data[k];});if(state.loggedIn)render();applyingRemote=false;}
+function scheduleSync(){if(!SUPA.connected||applyingRemote)return;clearTimeout(syncT);syncT=setTimeout(pushState,300);}
+async function pushState(){try{if(!SUPA.connected)return;const s=serialize();
+  SUPA.room&&SUPA.room.send({type:'broadcast',event:'state',payload:{state:s}});
+  await SUPA.sb.from('workspaces').upsert({team_code:state.user.team,state:s});}catch(e){console.warn('sync',e);}}
+async function joinRoom(){
+  if(!SUPA_ENABLED||typeof window.supabase==='undefined')return {ok:false,reason:'local'};
+  try{
+    SUPA.sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
+    // 기존 상태 로드
+    const {data:row}=await SUPA.sb.from('workspaces').select('state').eq('team_code',state.user.team).maybeSingle();
+    if(row&&row.state)applyRemote(row.state);
+    // 팀 코드로 실시간 채널 입장
+    SUPA.room=SUPA.sb.channel('room:'+state.user.team,{config:{broadcast:{self:false}}});
+    SUPA.room.on('broadcast',{event:'state'},({payload})=>applyRemote(payload.state)).subscribe();
+    SUPA.connected=true; return {ok:true};
+  }catch(e){console.warn('join',e);return {ok:false,reason:'error'};}
+}
+
+/* ===== data ===== */
+const THEMES=[
+  {key:"지역경제",color:"#0E5C63",subs:["일자리","상권 활성화","스마트팜","창업"]},
+  {key:"지역 불균형",color:"#13808A",subs:["교통망","의료 공백","교육"]},
+  {key:"인구문제",color:"#F2913D",subs:["고령화","청년 유출","돌봄"]},
+  {key:"기후위기",color:"#0A3B40",subs:["탄소중립","재난 안전","에너지"]},
+];
+const CHECKS=["4명 모두 주제 안에 자기 지분이 있다","한 문장으로 설명할 수 있다","제주에서만 통하는 현장성이 있다","지금 당장 시작할 첫걸음이 있다","완벽함보다 진정성이 담겨 있다"];
+const STEPS=[{t:"시작",s:"안내"},{t:"STEP 1",s:"개인 공유",min:15},{t:"STEP 2",s:"키워드 도출",min:15},{t:"STEP 3",s:"대주제 선정",min:15},{t:"STEP 4",s:"소주제 재설정",min:10},{t:"STEP 5",s:"팀주제·팀명",min:10},{t:"결과",s:"확정·피치",min:15}];
+
+/* ===== offline AI engine (swappable with real LLM) =====
+   교체 지점: aiExtractKeywords / aiCommonKeywords / aiRecommendTheme 세 함수를
+   서버(Railway) LLM 프록시 fetch 호출로 바꾸면 실제 AI로 승급됩니다. */
+const STOP=["그리고","하지만","그래서","때문","통해","위해","대한","대해","가장","정말","매우","너무","같은","같이","있는","없는","되는","하는","문제","해결","생각","부분","사람","우리","제주","지역","싶은","이유","관심","다양","여러","조금","많이","점점","더욱","위한","것을","것이","수가","때문에"];
+const LEX=["교통","이동","버스","대중교통","노선","차선","도로","주차","배차","접근성","통학","교통망","드론","환경","쓰레기","재활용","오염","탄소","탄소중립","친환경","에너지","재생에너지","기후","재난","해양","플라스틱","분리수거","관광","여행","체류","숙박","상권","자영업","창업","일자리","소상공인","물가","로컬","스마트팜","농업","경제","고령화","청년","유출","인구","돌봄","복지","의료","병원","교육","학교","정주","안전","사고","위험","시인성","방범","재해"];
+const SYN={
+  이동성:["교통","이동","버스","대중교통","노선","DRT","배차","통학","접근성","교통망","주차","드론"],
+  도로안전:["차선","도로","안전","사고","시인성","위험","표지","재해"],
+  환경:["환경","쓰레기","재활용","오염","플라스틱","해양","분리수거"],
+  기후에너지:["탄소","탄소중립","친환경","에너지","재생에너지","기후","재난"],
+  관광체류:["관광","여행","체류","숙박","로컬"],
+  경제창업:["상권","자영업","창업","일자리","소상공인","물가","스마트팜","농업","경제"],
+  인구돌봄:["고령화","청년","유출","인구","돌봄","복지","정주"],
+  의료교육:["의료","병원","교육","학교"],
+};
+const CLUSTER_LABEL={이동성:"이동·교통 접근성",도로안전:"도로·이동 안전",환경:"환경·쓰레기",기후에너지:"기후·에너지",관광체류:"관광·체류",경제창업:"상권·창업",인구돌봄:"인구·돌봄",의료교육:"의료·교육"};
+const CLUSTER_THEME={이동성:"지역 불균형",도로안전:"지역 불균형",의료교육:"지역 불균형",환경:"기후위기",기후에너지:"기후위기",관광체류:"지역경제",경제창업:"지역경제",인구돌봄:"인구문제"};
+const JOSA=/(으로|로써|로서|에서|에게|한테|까지|부터|처럼|만큼|이라는|라는|이라고|라고|이나|은|는|이|가|을|를|에|와|과|도|의|만|들|한|할|해|했|와의|과의)$/;
+
+function aiExtractKeywords(text){
+  text=(text||"");
+  const hits=LEX.filter(t=>text.includes(t));
+  const toks=text.split(/[^가-힣A-Za-z0-9]+/).filter(Boolean);
+  const gen=[];
+  toks.forEach(w=>{let s=w.replace(JOSA,"");if(s.length>=2&&s.length<=6&&!STOP.includes(s)&&!hits.includes(s)&&!gen.includes(s))gen.push(s);});
+  return [...new Set([...hits,...gen])].slice(0,8);
+}
+function clusterOf(kw){for(const k in SYN){if(SYN[k].some(t=>kw.includes(t)||t.includes(kw)))return k;}return null;}
+function aiCommonKeywords(members){
+  const map={};
+  members.forEach((m,i)=>{(m.keywords||[]).forEach(kw=>{const c=clusterOf(kw);if(!c)return;
+    if(!map[c])map[c]={keys:new Set(),mem:new Set()};map[c].keys.add(kw);map[c].mem.add(m.name||("팀원"+(i+1)));});});
+  return Object.entries(map).map(([k,v])=>({key:k,label:CLUSTER_LABEL[k],keys:[...v.keys],members:[...v.mem]}))
+    .sort((a,b)=>b.members.length-a.members.length||b.keys.length-a.keys.length).slice(0,3);
+}
+const IDEA_BANK={
+  "지역경제":["지역 자원을 활용한 {sub} 로컬 브랜드·창업 챌린지","방문객을 단골로 만드는 {sub} 체류형 서비스","데이터 기반 {kw} 상권·소상공인 매칭 플랫폼"],
+  "지역 불균형":["{sub} 사각지대를 잇는 수요응답형(DRT)·셔틀 파일럿","데이터로 {sub} 취약 지역을 지도화해 우선순위 개선","{kw} 기반 민·관·대학 협력 이동권 프로그램"],
+  "인구문제":["주민·청년이 함께하는 {sub} 커뮤니티·돌봄 네트워크","{sub}를 완화하는 정주 인센티브·생활 공간","세대를 잇는 {kw} 연결 프로그램"],
+  "기후위기":["{sub}를 줄이는 시민 참여형 리워드 캠페인","{kw} 순환(재활용·저탄소) 생활 인프라","관광지 대상 {sub} 저감 파일럿 존"],
+};
+function aiIdeas(st){
+  const th=st.selectedTheme, sub=st.subtopic||(th||"핵심 문제");
+  const kw=(st.clusters.find(c=>c.label)||{}).label||(st.members.flatMap(m=>m.keywords)[0])||"데이터";
+  const bank=IDEA_BANK[th]||["{sub}를 해결하는 시민 참여형 서비스","{kw}를 활용한 데이터 기반 솔루션","제주 현장에 맞춘 {sub} 파일럿 프로젝트"];
+  return bank.map(t=>t.replace(/\{sub\}/g,sub).replace(/\{kw\}/g,kw));
+}
+function aiRecommendTheme(members){
+  const score={};THEMES.forEach(t=>score[t.key]={n:0,keys:new Set()});
+  members.forEach(m=>{(m.keywords||[]).forEach(kw=>{const c=clusterOf(kw);if(!c)return;const th=CLUSTER_THEME[c];if(!th)return;score[th].n++;score[th].keys.add(kw);});});
+  const rank=Object.entries(score).map(([k,v])=>({theme:k,n:v.n,keys:[...v.keys]})).sort((a,b)=>b.n-a.n);
+  return rank;
+}
+
+/* ===== state ===== */
+const state={loggedIn:false,user:{name:"",team:""},step:0,
+  members:[m(),m(),m(),m()],clusters:[c(),c(),c()],
+  themeNotes:{},themeVotes:{},selectedTheme:null,aiThemeRank:null,aiCommon:null,
+  subtopic:"",subReason:"",teamName:"",teamTopic:"",ideaMemo:"",aiIdeaList:null,checks:[false,false,false,false,false]};
+THEMES.forEach(t=>{state.themeNotes[t.key]="";state.themeVotes[t.key]=0;});
+function m(){return {name:"",problem:"",idea:"",keywords:[],kwSuggest:null,rolePart:"",roleLink:"",isMe:false}}
+function c(){return {label:"",members:""}}
+
+const $=(s,el=document)=>el.querySelector(s);
+const view=$("#view");
+function esc(s){return (s||"").replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+
+/* ===== timer ===== */
+let timerId=null,timerLeft=0,timerRun=false;
+function timerHTML(min){return `<div class="timer"><button class="reset" onclick="tReset(${min})">↺</button><span class="t" id="tdisp">${fmt(min*60)}</span><button onclick="tToggle(${min})" id="tbtn">▶</button></div>`}
+function fmt(s){const m=Math.floor(s/60),x=s%60;return `${m}:${String(x).padStart(2,"0")}`}
+function tToggle(min){if(timerLeft<=0&&!timerRun)timerLeft=min*60;timerRun=!timerRun;const b=$("#tbtn");if(b)b.textContent=timerRun?"❚❚":"▶";
+  if(timerRun){timerId=setInterval(()=>{if(timerLeft>0){timerLeft--;const d=$("#tdisp");if(d)d.textContent=fmt(timerLeft);}else{clearInterval(timerId);timerRun=false;const b=$("#tbtn");if(b)b.textContent="▶";const d=$("#tdisp");if(d)d.style.color="#D9762A";}},1000);}else clearInterval(timerId);}
+function tReset(min){clearInterval(timerId);timerRun=false;timerLeft=min*60;const d=$("#tdisp");if(d){d.textContent=fmt(min*60);d.style.color="";}const b=$("#tbtn");if(b)b.textContent="▶";}
+function clearTimer(){clearInterval(timerId);timerRun=false;timerLeft=0;}
+
+/* ===== nav ===== */
+function nav(showBack=true,nextLabel="다음 단계 →"){
+  const back=showBack?`<button class="btn ghost" onclick="go(-1)">← 이전</button>`:`<span></span>`;
+  const next=state.step<STEPS.length-1?`<button class="btn primary" onclick="go(1)">${nextLabel}</button>`:`<span></span>`;
+  return `<div class="navbtns">${back}${next}</div>`;
+}
+function go(d){clearTimer();state.step=Math.max(0,Math.min(STEPS.length-1,state.step+d));render();window.scrollTo({top:0,behavior:"smooth"});}
+function phead(i){const st=STEPS[i];return `<div class="phead"><div class="ptitle"><div class="badge">${i}</div><div><div class="sub">${st.t}</div><h2>${st.s}</h2></div></div>${st.min?timerHTML(st.min):""}</div>`}
+
+/* ===== render root ===== */
+function render(){
+  if(!state.loggedIn){$("#userbar").classList.add("hidden");$("#stepper").classList.add("hidden");return renderLogin();}
+  $("#userbar").classList.remove("hidden");$("#stepper").classList.remove("hidden");
+  renderUserbar();renderStepper();
+  [renderIntro,renderStep1,renderStep2,renderStep3,renderStep4,renderStep5,renderResult][state.step]();
+}
+function renderUserbar(){
+  $("#userbar").innerHTML=`<span class="who">👤 <b>${esc(state.user.name)}</b> · ${esc(state.user.team)}</span>
+    <span class="livehint">${SUPA.connected?'🟢 실시간 연결됨 · 팀원과 동기화 중':'· 로컬 모드'}</span>
+    <button class="out" onclick="logout()">나가기</button>`;
+}
+function renderStepper(){const sp=$("#stepper");sp.innerHTML="";STEPS.forEach((st,i)=>{const b=document.createElement("button");
+  b.className=(i===state.step?"active":"")+(i<state.step?" done":"");b.innerHTML=`<span class="n">${i}</span>${st.t}`;
+  b.onclick=()=>{clearTimer();state.step=i;render();};sp.appendChild(b);});}
+
+/* ===== login ===== */
+function renderLogin(){
+  view.innerHTML=`<div class="login"><div class="lcard">
+    <h2>팀 워크스페이스 입장</h2>
+    <p class="desc">이름을 입력하고 우리 팀 방으로 들어가세요.</p>
+    <label class="fl">이름</label>
+    <input type="text" id="loginName" placeholder="이름을 입력하세요" value="${esc(state.user.name)}">
+    <label class="fl" style="margin-top:16px">팀 선택</label>
+    <div class="teamsel" id="teamsel">
+      ${["팀 1","팀 2","팀 3"].map(t=>`<button class="${state.user.team===t?'on':''}" onclick="pickTeam('${t}')">${t}</button>`).join("")}
+    </div>
+    <button class="btn primary" style="width:100%;margin-top:22px" onclick="doLogin()" id="enterBtn">워크스페이스 입장 →</button>
+    <div class="note" id="loginNote">${SUPA_ENABLED
+      ? "🟢 실시간 동시편집이 활성화되어 있습니다. 같은 팀으로 입장한 사람끼리 화면이 동기화됩니다."
+      : "🔗 로컬 모드 — 여러 기기 실시간 동기화는 코드 상단 SUPABASE_URL·ANON_KEY를 채우면 켜집니다."}</div>
+  </div></div>`;
+}
+function pickTeam(t){const nm=$("#loginName");if(nm)state.user.name=nm.value;state.user.team=t;renderLogin();$("#loginName").focus();}
+async function doLogin(){
+  const nm=$("#loginName").value.trim();
+  if(!nm){$("#loginName").style.borderColor="#c0392b";$("#loginName").focus();return;}
+  if(!state.user.team)state.user.team="팀 1";
+  state.user.name=nm;
+  if(SUPA_ENABLED){
+    const btn=$("#enterBtn");if(btn){btn.textContent="입장 중…";btn.disabled=true;}
+    const r=await joinRoom();
+    if(!r.ok&&r.reason!=='local'){
+      const note=$("#loginNote");if(note){note.textContent="연결 실패 — 네트워크나 설정값을 확인하고 다시 시도하세요.";note.style.color="#c0392b";}
+      if(btn){btn.textContent="워크스페이스 입장 →";btn.disabled=false;}return;
+    }
+  }
+  state.loggedIn=true;
+  const empty=state.members.find(x=>!x.name);
+  if(empty){empty.name=nm;empty.isMe=true;}
+  state.step=0;render();window.scrollTo({top:0});
+  if(SUPA.connected)pushState();
+}
+function logout(){clearTimer();try{if(SUPA.room)SUPA.sb.removeChannel(SUPA.room);}catch(e){}SUPA.connected=false;SUPA.room=null;state.loggedIn=false;render();window.scrollTo({top:0});}
+
+/* ===== intro (lean — 세부 설명은 슬라이드로) ===== */
+function renderIntro(){
+  view.innerHTML=`<div class="panel">
+    <h2 style="font-size:23px;margin-bottom:8px">${esc(state.user.team)} 워크스페이스</h2>
+    <div class="miniflow" style="max-width:560px">${[["① 세부내용 · 개인 4명의 문제·아이디어","var(--ocean)"],["② 소주제 · 공통 키워드","var(--teal)"],["③ 대주제 · 4개 프레임 중 선정  ★전환점","var(--tan)"],["④ 소주제 · 재설정","var(--teal)"],["⑤ 세부내용 · 팀 주제·아이디어","var(--ocean)"]]
+      .map((r,k,a)=>`<div class="mf" style="background:${r[1]}">${r[0]}</div>${k<a.length-1?'<div class="arw">▼</div>':''}`).join("")}</div>
+    <p style="color:var(--muted);font-size:13px;margin-top:14px">방법 세부 설명은 안내 슬라이드를 참고하세요. 준비되면 시작합니다.</p>
+    <div class="navbtns"><span></span><button class="btn primary" onclick="go(1)">워크숍 시작 →</button></div></div>`;
+}
+
+/* ===== step1 ===== */
+function renderStep1(){
+  view.innerHTML=`<div class="panel">${phead(1)}
+    <div class="prompt"><b>진행 발문</b> &nbsp;제주에서 가장 해결하고 싶은 문제 하나와 그 해결 아이디어를, 각자 1분씩 소개해 주세요.</div>
+    <div id="members"></div>
+    <button class="addbtn" onclick="addMember()">+ 팀원 추가</button>${nav(true)}</div>`;
+  renderMembers();
+}
+function renderMembers(){const box=$("#members");box.innerHTML="";
+  state.members.forEach((mem,idx)=>{const d=document.createElement("div");d.className="member"+(mem.isMe?" me":"");
+    d.innerHTML=`<div class="mtop"><div class="mnum">${idx+1}</div>
+      <input type="text" placeholder="이름" value="${esc(mem.name)}" oninput="state.members[${idx}].name=this.value">
+      ${mem.isMe?'<span class="mebadge">나</span>':''}
+      ${state.members.length>2?`<button class="del" onclick="delMember(${idx})">×</button>`:""}</div>
+      <div class="grid2"><div><label class="fl">해결하고 싶은 문제</label>
+        <textarea oninput="state.members[${idx}].problem=this.value" placeholder="어떤 문제가 왜 신경 쓰이나요?">${esc(mem.problem)}</textarea></div>
+      <div><label class="fl">해결 아이디어</label>
+        <textarea oninput="state.members[${idx}].idea=this.value" placeholder="어떻게 풀어볼 수 있을까요?">${esc(mem.idea)}</textarea></div></div>`;
+    box.appendChild(d);});}
+function addMember(){state.members.push(m());renderMembers();}
+function delMember(i){state.members.splice(i,1);renderMembers();}
+
+/* ===== step2 ===== */
+function renderStep2(){
+  view.innerHTML=`<div class="panel">${phead(2)}
+    <div class="prompt"><b>진행 발문</b> &nbsp;각자 아이디어에서 핵심 단어를 뽑고, 반복되거나 서로 통하는 키워드끼리 묶어보세요.</div>
+    <label class="fl" style="font-size:14px">① 키워드 추출 <span style="color:var(--violet)">— ✨ AI 추천 버튼으로 자동 제안</span></label>
+    <div id="kwextract"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:20px;flex-wrap:wrap;gap:8px">
+      <label class="fl" style="font-size:14px;color:var(--tan-dk);margin:0">② 공통 키워드 묶음</label>
+      <button class="aibtn" onclick="runAiCommon()">✨ AI 공통 키워드 3안 제시</button></div>
+    <div id="aicommon"></div>
+    <div style="margin-top:12px"><div class="ailabel" style="color:var(--muted)">직접 입력 (수정·추가)</div><div id="clusters"></div></div>
+    <button class="addbtn" onclick="addCluster()">+ 묶음 추가</button>${nav(true)}</div>`;
+  renderKwExtract();renderAiCommon();renderClusters();
+}
+function renderKwExtract(){const box=$("#kwextract");box.innerHTML="";
+  state.members.forEach((mem,idx)=>{const d=document.createElement("div");d.style.marginBottom="14px";
+    d.innerHTML=`<div class="idea-ref"><b>${esc(mem.name||('팀원 '+(idx+1)))}</b> · 아이디어: ${esc(mem.idea)||'<span style="color:#9bb">—</span>'}</div>
+      <div style="display:flex;gap:8px;align-items:flex-start"><input type="text" placeholder="예: 교통, 이동, 안전" value="${esc(mem.keywords.join(', '))}" oninput="setKw(${idx},this.value)">
+      <button class="aibtn" style="flex-shrink:0" onclick="aiKw(${idx})">✨ AI 추천</button></div>
+      <div class="chips" id="chips${idx}"></div>
+      <div id="sugg${idx}"></div>`;
+    box.appendChild(d);drawChips(idx);drawSugg(idx);});}
+function setKw(idx,val){state.members[idx].keywords=val.split(",").map(s=>s.trim()).filter(Boolean);drawChips(idx);}
+function drawChips(idx){const c=$("#chips"+idx);if(!c)return;c.innerHTML=state.members[idx].keywords.map(k=>`<span class="chip sel">${esc(k)}</span>`).join("");}
+function aiKw(idx){const m=state.members[idx];m.kwSuggest=aiExtractKeywords((m.idea||"")+" "+(m.problem||""));drawSugg(idx);}
+function drawSugg(idx){const box=$("#sugg"+idx);if(!box)return;const m=state.members[idx];
+  if(!m.kwSuggest){box.innerHTML="";return;}
+  const fresh=m.kwSuggest.filter(k=>!m.keywords.includes(k));
+  box.innerHTML=`<div class="ailabel">✨ AI 추천 키워드 — 클릭해서 채택${fresh.length?"":" (모두 채택됨)"}</div>
+    <div class="chips">${fresh.map(k=>`<span class="chip ai" onclick="adoptKw(${idx},'${esc(k)}')">+ ${esc(k)}</span>`).join("")||'<span style="font-size:12px;color:var(--muted)">추천 키워드가 모두 반영되었습니다.</span>'}</div>`;}
+function adoptKw(idx,k){if(!state.members[idx].keywords.includes(k))state.members[idx].keywords.push(k);drawChips(idx);drawSugg(idx);
+  const inp=$("#kwextract").querySelectorAll("input")[idx];if(inp)inp.value=state.members[idx].keywords.join(", ");}
+function runAiCommon(){state.aiCommon=aiCommonKeywords(state.members);renderAiCommon();}
+function renderAiCommon(){const box=$("#aicommon");if(!box)return;
+  if(!state.aiCommon){box.innerHTML="";return;}
+  if(!state.aiCommon.length){box.innerHTML=`<div class="aibanner">먼저 ① 에서 키워드를 입력/채택하면 공통 묶음을 제안할 수 있어요.</div>`;return;}
+  box.innerHTML=`<div class="ailabel" style="margin-top:8px">✨ AI 공통 키워드 3안 — '이 안 적용'으로 아래 직접 입력에 채웁니다</div>`+
+    state.aiCommon.map((s,i)=>`<div class="aicard"><div class="rank">${i+1}</div>
+      <div class="body"><div class="lab">${esc(s.label)} <span style="color:var(--muted);font-weight:400;font-size:12px">(${esc(s.keys.join(', '))})</span></div>
+      <div class="mem">관련 인원: ${esc(s.members.join(', '))||'—'}</div></div>
+      <button class="btn ghost" style="padding:8px 14px" onclick="applyCommon(${i})">이 안 적용</button></div>`).join("");}
+function applyCommon(i){const s=state.aiCommon[i];let slot=state.clusters.find(c=>!c.label);if(!slot){slot=c();state.clusters.push(slot);}
+  slot.label=s.label;slot.members=s.members.join(', ');renderClusters();}
+function renderClusters(){const box=$("#clusters");box.innerHTML="";
+  state.clusters.forEach((cl,idx)=>{const d=document.createElement("div");d.style.marginBottom="10px";
+    d.innerHTML=`<div style="display:flex;gap:10px;align-items:center">
+      <div style="width:30px;height:30px;border-radius:8px;background:var(--sea2);color:var(--ocean);display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0">${String.fromCharCode(65+idx)}</div>
+      <input type="text" placeholder="공통 키워드 (예: 이동·접근성)" value="${esc(cl.label)}" oninput="state.clusters[${idx}].label=this.value">
+      <input type="text" placeholder="관련 인원" style="max-width:170px" value="${esc(cl.members)}" oninput="state.clusters[${idx}].members=this.value">
+      ${state.clusters.length>1?`<button class="del" onclick="delCluster(${idx})">×</button>`:""}</div>`;
+    box.appendChild(d);});}
+function addCluster(){state.clusters.push(c());renderClusters();}
+function delCluster(i){state.clusters.splice(i,1);renderClusters();}
+
+/* ===== step3 ===== */
+function renderStep3(){
+  const kw=state.clusters.filter(c=>c.label).map(c=>c.label).join(" · ")||"—";
+  view.innerHTML=`<div class="panel">${phead(3)}
+    <div class="prompt"><b>진행 발문</b> &nbsp;도출한 키워드를 아래 4개 대주제에 붙여보고, 가장 많이 모인 곳을 팀 대주제로 정하세요.</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <div class="idea-ref" style="margin:0;flex:1">STEP 2 공통 키워드: <b>${esc(kw)}</b></div>
+      <button class="aibtn" onclick="runAiTheme()">✨ AI 대주제 추천</button></div>
+    <div id="aitheme"></div>
+    <div id="themes" style="margin-top:12px"></div>${nav(true)}</div>`;
+  renderAiTheme();renderThemes();
+}
+function runAiTheme(){state.aiThemeRank=aiRecommendTheme(state.members);renderAiTheme();renderThemes();}
+function renderAiTheme(){const box=$("#aitheme");if(!box)return;
+  if(!state.aiThemeRank){box.innerHTML="";return;}
+  const top=state.aiThemeRank.find(r=>r.n>0);
+  if(!top){box.innerHTML=`<div class="aibanner">키워드가 부족해요. STEP 2에서 키워드를 채운 뒤 다시 추천해 주세요.</div>`;return;}
+  box.innerHTML=`<div class="aibanner">✨ <b>AI 추천 대주제: ${esc(top.theme)}</b> &nbsp;— 붙은 키워드: ${esc(top.keys.join(', '))}
+    <div style="margin-top:6px;font-size:12.5px;color:#6b5ca5">전체 점수: ${state.aiThemeRank.filter(r=>r.n>0).map(r=>esc(r.theme)+' '+r.n).join(' · ')}</div></div>`;}
+function renderThemes(){const box=$("#themes");box.innerHTML="";
+  const maxV=Math.max(...THEMES.map(t=>state.themeVotes[t.key]),0);
+  const rec=state.aiThemeRank?(state.aiThemeRank.find(r=>r.n>0)||{}).theme:null;
+  THEMES.forEach((t,idx)=>{const on=state.selectedTheme===t.key;const isWin=maxV>0&&state.themeVotes[t.key]===maxV;const isRec=rec===t.key;
+    const d=document.createElement("div");d.className="themecard"+(on?" on":"")+(isRec?" rec":"");
+    d.innerHTML=`<div class="th" onclick="pickTheme('${t.key}')"><div class="tnum" style="background:${t.color}">${String(idx+1).padStart(2,"0")}</div>
+      <h3>${t.key}${isRec?'<span class="tag ai">AI 추천</span>':''}${isWin?'<span class="tag win">최다</span>':''}</h3></div>
+      <div class="sub-chips">${t.subs.map(s=>`<span>${s}</span>`).join("")}</div>
+      <textarea placeholder="우리 팀 키워드가 이 주제에 붙는 지점은…" oninput="state.themeNotes['${t.key}']=this.value">${esc(state.themeNotes[t.key])}</textarea>
+      <div class="voterow"><span class="lbl">도트 투표</span><div class="vote"><button onclick="voteT('${t.key}',-1)">−</button><span class="cnt">${state.themeVotes[t.key]}</span><button onclick="voteT('${t.key}',1)">+</button></div>
+      <span class="dots">${"●".repeat(Math.min(state.themeVotes[t.key],8))}</span>
+      <button class="btn ${on?'tan':'ghost'}" style="margin-left:auto;padding:7px 16px" onclick="pickTheme('${t.key}')">${on?'✓ 선정됨':'이걸로 선정'}</button></div>`;
+    box.appendChild(d);});}
+function voteT(k,d){state.themeVotes[k]=Math.max(0,state.themeVotes[k]+d);renderThemes();}
+function pickTheme(k){state.selectedTheme=k;if(!THEMES.find(t=>t.key===k).subs.includes(state.subtopic))state.subtopic="";renderThemes();}
+
+/* ===== step4 ===== */
+function renderStep4(){
+  if(!state.selectedTheme){view.innerHTML=`<div class="panel">${phead(4)}<div class="prompt" style="background:#FDEDED"><b style="color:#c0392b">먼저 STEP 3에서 대주제를 선정해 주세요.</b></div>${nav(true)}</div>`;return;}
+  const th=THEMES.find(t=>t.key===state.selectedTheme);
+  view.innerHTML=`<div class="panel">${phead(4)}
+    <div class="prompt"><b>진행 발문</b> &nbsp;선정한 대주제 안에서, 우리 아이디어가 가장 많이 겹치는 소주제를 하나 고르세요.</div>
+    <div class="idea-ref">선정한 대주제: <b style="color:var(--tan-dk)">${esc(th.key)}</b></div>
+    <label class="fl">후보 소주제 — 하나를 선택하거나 직접 입력</label>
+    <div class="chips" id="subchips"></div>
+    <input type="text" placeholder="직접 입력 (예: 교통 사각지대 이동권)" style="margin-top:10px" value="${esc(state.subtopic)}" oninput="state.subtopic=this.value;renderSubChips()">
+    <label class="fl" style="margin-top:16px">선택한 소주제 & 이유</label>
+    <textarea placeholder="우리 팀이 이 소주제를 고른 이유는…" oninput="state.subReason=this.value">${esc(state.subReason)}</textarea>${nav(true)}</div>`;
+  renderSubChips();
+}
+function renderSubChips(){const th=THEMES.find(t=>t.key===state.selectedTheme);const box=$("#subchips");if(!box)return;
+  box.innerHTML=th.subs.map(s=>`<span class="chip ${state.subtopic===s?'sel':''}" onclick="setSub('${s}')">${s}</span>`).join("");}
+function setSub(s){state.subtopic=s;const inp=$(".panel input[type=text]");if(inp)inp.value=s;renderSubChips();}
+
+/* ===== step5 ===== */
+function renderStep5(){
+  view.innerHTML=`<div class="panel">${phead(5)}
+    <div class="prompt"><b>진행 발문</b> &nbsp;팀명을 정하고, 소주제를 한 문장의 팀 주제로 만든 뒤 4명의 역할을 나누세요.</div>
+    <label class="fl">팀명</label>
+    <input type="text" id="teamNameInput" placeholder="예: 제주 모빌리티 크루" value="${esc(state.teamName)}" oninput="state.teamName=this.value">
+    <label class="fl" style="margin-top:16px">팀 주제 (한 문장)</label>
+    <input type="text" id="teamTopicInput" placeholder='예: "AI 수요응답형 교통(DRT)과 안전 도로로 제주 교통 사각지대 해소"' value="${esc(state.teamTopic)}" oninput="state.teamTopic=this.value">
+    <label class="fl" style="margin-top:16px">역할 · 지분 분배</label>
+    <div id="roles"></div>${nav(true,"결과 보기 →")}</div>`;
+  renderRoles();
+}
+function renderRoles(){const box=$("#roles");box.innerHTML="";
+  state.members.forEach((mem,idx)=>{const d=document.createElement("div");d.style.marginBottom="10px";
+    d.innerHTML=`<div style="display:flex;gap:10px;align-items:flex-start"><div class="mnum" style="margin-top:6px">${idx+1}</div>
+      <div style="flex:1"><div style="font-weight:700;margin-bottom:4px">${esc(mem.name||('팀원 '+(idx+1)))}${mem.isMe?' <span class="mebadge">나</span>':''}</div>
+      <div class="grid2"><input type="text" placeholder="맡을 부분" value="${esc(mem.rolePart||'')}" oninput="state.members[${idx}].rolePart=this.value">
+      <input type="text" placeholder="내 원래 아이디어와의 연결" value="${esc(mem.roleLink||'')}" oninput="state.members[${idx}].roleLink=this.value"></div></div></div>`;
+    box.appendChild(d);});}
+
+/* ===== result ===== */
+function renderResult(){
+  const th=state.selectedTheme||"—";
+  const kw=state.clusters.filter(c=>c.label).map(c=>c.label).join(" · ")||"—";
+  const topic=state.teamTopic||"—";
+  view.innerHTML=`<div class="panel">${phead(6)}
+    <div class="result-hero">
+      <div class="teamname">🏴 ${esc(state.teamName||'(팀명 미정)')} · ${esc(state.user.team)}</div>
+      <div class="path">세부내용 → <b>${esc(kw)}</b> → 대주제 <b>${esc(th)}</b> → 소주제 <b>${esc(state.subtopic||'—')}</b> → 팀 주제</div>
+      <h2>${esc(topic)}</h2></div>
+    <div class="rbox" style="margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <h4 style="margin:0">💡 아이디어 도출</h4>
+        <button class="aibtn" onclick="runAiIdeas()">✨ AI 아이디어 추천</button></div>
+      <div id="ideaSugg"></div>
+      <textarea id="ideaMemo" style="margin-top:10px" placeholder="팀의 핵심 아이디어를 간략히 적어보세요 (AI 추천을 담아 다듬어도 좋아요)" oninput="state.ideaMemo=this.value">${esc(state.ideaMemo)}</textarea>
+    </div>
+    <div class="rgrid">
+      <div class="rbox"><h4>1분 피치 템플릿</h4><div class="pitch">우리 팀 <b>${esc(state.teamName||'___')}</b>은(는) <b>${esc(th)}</b>의 <b>${esc(state.subtopic||'___')}</b> 문제를 <b>${esc(topic)}</b>(으)로 해결한다.<br><br>핵심 아이디어를 4명이 나눠 맡는다.</div></div>
+      <div class="rbox"><h4>확정 체크리스트</h4><div id="checks"></div></div></div>
+    <div class="rbox" style="margin-top:14px"><h4>역할 · 지분</h4>
+      <table class="roletbl"><thead><tr><th style="width:22%">이름</th><th>맡을 부분</th><th style="width:34%">원래 아이디어와의 연결</th></tr></thead>
+      <tbody>${state.members.map(mm=>`<tr><td><b>${esc(mm.name||'—')}</b></td><td>${esc(mm.rolePart||'—')}</td><td>${esc(mm.roleLink||'—')}</td></tr>`).join("")}</tbody></table></div>
+    <div class="navbtns"><button class="btn ghost" onclick="go(-1)">← 이전</button>
+      <div style="display:flex;gap:10px"><button class="btn ghost" onclick="copySummary()" id="copybtn">📋 요약 복사</button><button class="btn tan" onclick="savePDF()" id="pdfbtn">📄 PDF 저장</button></div></div></div>`;
+  renderChecks();renderIdeaSugg();
+}
+function runAiIdeas(){state.aiIdeaList=aiIdeas(state);renderIdeaSugg();}
+function renderIdeaSugg(){const box=$("#ideaSugg");if(!box)return;
+  if(!state.aiIdeaList){box.innerHTML="";return;}
+  box.innerHTML=`<div class="ailabel" style="margin-top:10px">✨ AI 아이디어 3안 — '담기'로 메모에 추가</div>`+
+    state.aiIdeaList.map((t,i)=>`<div class="aicard"><div class="rank">${i+1}</div><div class="body"><div class="lab" style="font-weight:400;color:var(--ink)">${esc(t)}</div></div>
+    <button class="btn ghost" style="padding:8px 14px" onclick="addIdea(${i})">담기</button></div>`).join("");}
+function addIdea(i){const t=state.aiIdeaList[i];state.ideaMemo=(state.ideaMemo?state.ideaMemo+"\n":"")+"• "+t;const ta=$("#ideaMemo");if(ta)ta.value=state.ideaMemo;}
+function renderChecks(){const box=$("#checks");box.innerHTML="";CHECKS.forEach((c,i)=>{const d=document.createElement("div");
+  d.className="check"+(state.checks[i]?" on":"");d.innerHTML=`<div class="box">${state.checks[i]?"✓":""}</div><span>${c}</span>`;
+  d.onclick=()=>{state.checks[i]=!state.checks[i];renderChecks();};box.appendChild(d);});}
+function copySummary(){const th=state.selectedTheme||"—";const kw=state.clusters.filter(c=>c.label).map(c=>c.label).join(" · ")||"—";
+  let txt=`[역방향 팀빌딩 결과] ${state.teamName||''} (${state.user.team})\n`;
+  txt+=`흐름: 세부 → ${kw} → 대주제 ${th} → 소주제 ${state.subtopic||'—'} → 팀 주제\n\n팀 주제: ${state.teamTopic||'—'}\n소주제 이유: ${state.subReason||'—'}\n\n아이디어:\n${state.ideaMemo||'—'}\n\n역할:\n`;
+  state.members.forEach((m,i)=>{txt+=`- ${m.name||('팀원'+(i+1))}: ${m.rolePart||'—'} (${m.roleLink||'—'})\n`});
+  navigator.clipboard.writeText(txt).then(()=>{const b=$("#copybtn");b.textContent="✓ 복사됨";setTimeout(()=>b.textContent="📋 요약 복사",1500);}).catch(()=>{});}
+
+/* ===== PDF 저장 ===== */
+async function savePDF(){
+  const btn=$("#pdfbtn");const el=$("#view .panel");if(!el)return;
+  const fname=(state.teamName||state.user.team||'팀')+'_역방향팀빌딩_결과.pdf';
+  if(typeof window.html2canvas==='function'&&window.jspdf&&window.jspdf.jsPDF){
+    try{
+      if(btn){btn.textContent="저장 중…";btn.disabled=true;}
+      const canvas=await window.html2canvas(el,{scale:2,backgroundColor:'#ffffff',useCORS:true});
+      const img=canvas.toDataURL('image/png');
+      const {jsPDF}=window.jspdf;const pdf=new jsPDF('p','mm','a4');
+      const pw=210, ph=canvas.height*pw/canvas.width, pageH=297;
+      if(ph<=pageH){pdf.addImage(img,'PNG',0,0,pw,ph);}
+      else{let left=ph,pos=0;while(left>0){pdf.addImage(img,'PNG',0,pos,pw,ph);left-=pageH;pos-=pageH;if(left>0)pdf.addPage();}}
+      pdf.save(fname);
+    }catch(e){console.warn('pdf',e);window.print();}
+    finally{if(btn){btn.textContent="📄 PDF 저장";btn.disabled=false;}}
+  } else { window.print(); }
+}
+/* ===== 실시간 동기화 트리거(위임 리스너) ===== */
+document.addEventListener('input',scheduleSync,true);
+document.addEventListener('click',()=>setTimeout(scheduleSync,0),true);
+
+render();
+</script>
+</body>
+</html>
