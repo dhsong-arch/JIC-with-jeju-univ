@@ -450,7 +450,9 @@ function renderStep2(){
 }
 function renderKwExtract(){const box=$("#kwextract");box.innerHTML="";
   state.members.forEach((mem,idx)=>{const d=document.createElement("div");d.style.marginBottom="14px";
-    d.innerHTML=`<div class="idea-ref"><b>${esc(mem.name||('팀원 '+(idx+1)))}</b> · 아이디어: ${esc(mem.idea)||'<span style="color:#9bb">—</span>'}</div>
+    d.innerHTML=`<div class="idea-ref"><b>${esc(mem.name||('팀원 '+(idx+1)))}</b>
+      <div style="margin-top:4px"><b style="color:var(--tan-dk)">문제</b> ${esc(mem.problem)||'<span style="color:#b3a48f">—</span>'}</div>
+      <div style="margin-top:2px"><b style="color:var(--teal)">아이디어</b> ${esc(mem.idea)||'<span style="color:#b3a48f">—</span>'}</div></div>
       <div style="display:flex;gap:8px;align-items:flex-start"><input type="text" placeholder="예: 교통, 이동, 안전" value="${esc(mem.keywords.join(', '))}" oninput="setKw(${idx},this.value)">
       <button class="aibtn" style="flex-shrink:0" onclick="aiKw(${idx})">✨ AI 추천</button></div>
       <div class="chips" id="chips${idx}"></div>
