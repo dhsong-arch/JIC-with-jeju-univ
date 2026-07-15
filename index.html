@@ -275,7 +275,7 @@ const state={loggedIn:false,user:{name:"",team:""},step:0,
   members:[m(),m(),m(),m()],clusters:[c(),c(),c()],
   themeNotes:{},themeVotes:{},selectedTheme:null,aiThemeRank:null,aiCommon:null,
   subtopic:"",subReason:"",teamName:"",teamTopic:"",ideaMemo:"",aiIdeaList:null,checks:[false,false,false,false,false],
-  adminMode:false,adminAuthed:false,adminGate:false,_admin:{},adminOpen:{}};
+  adminMode:false,adminAuthed:false,adminGate:false,_admin:{},adminOpen:{},adminManage:{},adminConfirm:null};
 THEMES.forEach(t=>{state.themeNotes[t.key]="";state.themeVotes[t.key]=0;});
 function m(){return {name:"",problem:"",idea:"",keywords:[],kwSuggest:null,rolePart:"",roleLink:"",isMe:false}}
 function c(){return {label:"",members:""}}
@@ -283,6 +283,7 @@ function c(){return {label:"",members:""}}
 const $=(s,el=document)=>el.querySelector(s);
 const view=$("#view");
 function esc(s){return (s||"").replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function isMine(mem){return !!(state.user&&state.user.name&&mem&&mem.name&&mem.name===state.user.name)}
 
 /* ===== timer ===== */
 let timerId=null,timerLeft=0,timerRun=false;
@@ -376,8 +377,10 @@ async function doLogin(){
     // 실패해도 로컬로 진행 — 상태는 상단바에 표시
   }
   state.loggedIn=true;
-  const empty=state.members.find(x=>!x.name);
-  if(empty){empty.name=nm;empty.isMe=true;}
+  // 같은 이름이 이미 있으면 그 카드를 이어서 사용(중복 생성 방지) — 없으면 빈 슬롯/새 슬롯에 등록
+  const mine=state.members.find(x=>x.name&&x.name===nm);
+  if(!mine){const empty=state.members.find(x=>!x.name);
+    if(empty)empty.name=nm; else state.members.push(Object.assign(m(),{name:nm}));}
   state.step=0;render();window.scrollTo({top:0});
   if(SUPA.connected)pushState();
 }
@@ -402,10 +405,10 @@ function renderStep1(){
   renderMembers();
 }
 function renderMembers(){const box=$("#members");box.innerHTML="";
-  state.members.forEach((mem,idx)=>{const d=document.createElement("div");d.className="member"+(mem.isMe?" me":"");
+  state.members.forEach((mem,idx)=>{const d=document.createElement("div");d.className="member"+(isMine(mem)?" me":"");
     d.innerHTML=`<div class="mtop"><div class="mnum">${idx+1}</div>
       <input type="text" placeholder="이름" value="${esc(mem.name)}" oninput="state.members[${idx}].name=this.value">
-      ${mem.isMe?'<span class="mebadge">나</span>':''}
+      ${isMine(mem)?'<span class="mebadge">나</span>':''}
       ${state.members.length>2?`<button class="del" onclick="delMember(${idx})">×</button>`:""}</div>
       <div class="grid2"><div><label class="fl">해결하고 싶은 문제</label>
         <textarea oninput="state.members[${idx}].problem=this.value" placeholder="어떤 문제가 왜 신경 쓰이나요?">${esc(mem.problem)}</textarea></div>
@@ -537,7 +540,7 @@ function renderStep5(){
 function renderRoles(){const box=$("#roles");box.innerHTML="";
   state.members.forEach((mem,idx)=>{const d=document.createElement("div");d.style.marginBottom="10px";
     d.innerHTML=`<div style="display:flex;gap:10px;align-items:flex-start"><div class="mnum" style="margin-top:6px">${idx+1}</div>
-      <div style="flex:1"><div style="font-weight:700;margin-bottom:4px">${esc(mem.name||('팀원 '+(idx+1)))}${mem.isMe?' <span class="mebadge">나</span>':''}</div>
+      <div style="flex:1"><div style="font-weight:700;margin-bottom:4px">${esc(mem.name||('팀원 '+(idx+1)))}${isMine(mem)?' <span class="mebadge">나</span>':''}</div>
       <div class="grid2"><input type="text" placeholder="맡을 부분" value="${esc(mem.rolePart||'')}" oninput="state.members[${idx}].rolePart=this.value">
       <input type="text" placeholder="내 원래 아이디어와의 연결" value="${esc(mem.roleLink||'')}" oninput="state.members[${idx}].roleLink=this.value"></div></div></div>`;
     box.appendChild(d);});}
@@ -624,6 +627,41 @@ function exitAdmin(){
   state.adminMode=false;state.loggedIn=false;render();window.scrollTo({top:0});
 }
 function toggleTeam(k){state.adminOpen[k]=!state.adminOpen[k];renderAdmin();}
+function toggleManage(k){state.adminManage[k]=!state.adminManage[k];renderAdmin();}
+function freshShared(){const tv={},tn={};THEMES.forEach(t=>{tv[t.key]=0;tn[t.key]="";});
+  return {members:[m(),m(),m(),m()],clusters:[c(),c(),c()],themeNotes:tn,themeVotes:tv,selectedTheme:null,subtopic:"",subReason:"",teamName:"",teamTopic:"",ideaMemo:"",checks:[false,false,false,false,false]};}
+// 관리자 변경사항을 팀 채널로 브로드캐스트 + DB 저장
+let admPushT={};
+function adminPush(k){
+  const st=state._admin[k];if(!st)return;
+  try{
+    let ch=SUPA.adminChans.find(c=>c&&c.topic&&c.topic.indexOf('room-'+k)>=0);
+    if(ch)ch.send({type:'broadcast',event:'state',payload:{state:st}});
+    if(SUPA.sb)SUPA.sb.from('workspaces').upsert({team_code:k,state:st});
+  }catch(e){console.warn('[admin push]',e);}
+}
+function scheduleAdminPush(k){clearTimeout(admPushT[k]);admPushT[k]=setTimeout(()=>adminPush(k),350);}
+function adminSetName(k,i,v){const st=state._admin[k];if(!st)return;st.members=st.members||[];if(st.members[i]){st.members[i].name=v;scheduleAdminPush(k);}}
+function adminAddMember(k){const st=state._admin[k]||(state._admin[k]=freshShared());st.members=st.members||[];st.members.push(m());adminPush(k);renderAdmin();}
+function adminDelMember(k,i){const st=state._admin[k];if(!st||!st.members)return;st.members.splice(i,1);adminPush(k);renderAdmin();}
+function askReset(k){state.adminConfirm=k;renderAdmin();}
+function cancelReset(){state.adminConfirm=null;renderAdmin();}
+function doReset(k){
+  if(k==='__all__'){TEAM_KEYS.forEach(t=>{state._admin[t]=freshShared();adminPush(t);});}
+  else{state._admin[k]=freshShared();adminPush(k);}
+  state.adminConfirm=null;renderAdmin();
+}
+function manageHTML(k){const st=state._admin[k]||{};const ms=st.members||[];
+  let h=`<div style="margin-top:12px;background:var(--sea);border:1px solid var(--line);border-radius:10px;padding:14px">
+    <div style="font-weight:700;font-size:13.5px;color:var(--brown);margin-bottom:8px">👥 참여자 관리 · ${esc(TEAM_LABEL[k])} <span style="color:var(--muted);font-weight:400">(${ms.filter(x=>x.name).length}명)</span></div>`;
+  if(!ms.length)h+=`<div style="font-size:12.5px;color:var(--muted);margin-bottom:6px">아직 참여자가 없습니다.</div>`;
+  ms.forEach((mm,i)=>{h+=`<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+    <span style="width:24px;height:24px;border-radius:50%;background:var(--ocean);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">${i+1}</span>
+    <input type="text" value="${esc(mm.name||'')}" placeholder="참여자 이름" oninput="adminSetName('${k}',${i},this.value)" style="flex:1">
+    <button onclick="adminDelMember('${k}',${i})" title="삭제" style="border:none;background:#F2DEDA;color:#B23A2A;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:16px;font-family:inherit">×</button></div>`;});
+  h+=`<button class="addbtn" style="margin-top:6px;padding:9px" onclick="adminAddMember('${k}')">+ 참여자 추가</button>
+    <div style="font-size:11.5px;color:var(--muted);margin-top:6px">이름 수정·추가·삭제는 해당 팀 화면에 실시간 반영됩니다.</div></div>`;
+  return h;}
 function renderAdmin(){
   $("#userbar").classList.remove("hidden");
   $("#userbar").innerHTML=`<span class="who">🛠 <b>관리자 스페이스</b></span>
@@ -643,22 +681,37 @@ function renderAdmin(){
           <div><b style="font-size:18px">${esc(st.teamName||label)}</b> <span style="color:var(--muted);font-size:13px">· ${label}</span></div>
           <div style="font-size:13px;color:var(--muted);margin-top:3px">참여: ${names}</div>
           <div style="margin-top:8px;font-size:13.5px"><b style="color:var(--tan-dk)">${esc(th)}</b> ${st.subtopic?('› '+esc(st.subtopic)):''}</div>
-          <div style="font-size:14px;margin-top:2px">${esc(st.teamTopic||'<span style=color:#b3a48f>팀 주제 미정</span>')}</div>
+          <div style="font-size:14px;margin-top:2px">${st.teamTopic?esc(st.teamTopic):'<span style="color:#b3a48f">팀 주제 미정</span>'}</div>
         </div>
         <div style="text-align:right;min-width:150px">
           <div style="font-size:12px;color:var(--muted)">진행 ${p}/5</div>
-          <div style="background:var(--sea2);border-radius:8px;height:8px;width:150px;margin:5px 0;overflow:hidden"><div style="background:var(--tan);height:100%;width:${pct}%"></div></div>
-          <button class="btn ghost" style="padding:6px 12px;font-size:12.5px" onclick="toggleTeam('${k}')">${open?'접기':'상세'}</button>
-          <button class="btn tan" style="padding:6px 12px;font-size:12.5px" id="pdf_${k}" onclick="savePDFTeam('${k}')">PDF</button>
+          <div style="background:var(--sea2);border-radius:8px;height:8px;width:150px;margin:5px 0 8px auto;overflow:hidden"><div style="background:var(--tan);height:100%;width:${pct}%"></div></div>
+          <div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap">
+            <button class="btn ghost" style="padding:6px 11px;font-size:12px" onclick="toggleManage('${k}')">${state.adminManage[k]?'참여자 닫기':'참여자'}</button>
+            <button class="btn ghost" style="padding:6px 11px;font-size:12px" onclick="toggleTeam('${k}')">${open?'접기':'상세'}</button>
+            <button class="btn tan" style="padding:6px 11px;font-size:12px" id="pdf_${k}" onclick="savePDFTeam('${k}')">PDF</button>
+            <button class="btn" style="padding:6px 11px;font-size:12px;background:#F2DEDA;color:#B23A2A" onclick="askReset('${k}')">초기화</button>
+          </div>
         </div>
       </div>
+      ${state.adminConfirm===k?`<div style="margin-top:12px;background:#FDECEA;border:1px solid #f4c7c0;border-radius:10px;padding:12px 15px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <span style="color:#B23A2A;font-weight:700;font-size:13.5px">⚠️ ${esc(TEAM_LABEL[k])}의 모든 입력을 초기화할까요? 참여자 화면도 비워집니다.</span>
+        <button class="btn" style="padding:6px 14px;font-size:12.5px;background:#B23A2A;color:#fff" onclick="doReset('${k}')">초기화 확인</button>
+        <button class="btn ghost" style="padding:6px 14px;font-size:12.5px" onclick="cancelReset()">취소</button></div>`:''}
+      ${state.adminManage[k]?manageHTML(k):''}
       ${open?`<div style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">${reportHTML(buildStateFor(k))}</div>`:''}
     </div>`;
   }).join("");
   view.innerHTML=`<div class="panel" style="margin-bottom:0">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
-        <div><h2 style="font-size:22px">전체 팀 현황</h2><div style="color:var(--muted);font-size:13px">3개 팀의 진행 상황과 결과를 실시간으로 확인합니다.</div></div>
-        <button class="btn ghost" onclick="adminLoad()">↻ 새로고침</button></div>
+        <div><h2 style="font-size:22px">전체 팀 현황</h2><div style="color:var(--muted);font-size:13px">3개 팀의 진행·참여자 관리·초기화를 실시간으로 처리합니다.</div></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn ghost" onclick="adminLoad()">↻ 새로고침</button>
+          <button class="btn" style="background:#F2DEDA;color:#B23A2A" onclick="askReset('__all__')">전체 초기화</button></div></div>
+      ${state.adminConfirm==='__all__'?`<div style="margin-top:12px;background:#FDECEA;border:1px solid #f4c7c0;border-radius:10px;padding:12px 15px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <span style="color:#B23A2A;font-weight:700;font-size:13.5px">⚠️ 3개 팀 전부를 초기화할까요? 되돌릴 수 없습니다.</span>
+        <button class="btn" style="padding:6px 14px;font-size:12.5px;background:#B23A2A;color:#fff" onclick="doReset('__all__')">전체 초기화 확인</button>
+        <button class="btn ghost" style="padding:6px 14px;font-size:12.5px" onclick="cancelReset()">취소</button></div>`:''}
     </div>${cards}`;
 }
 
