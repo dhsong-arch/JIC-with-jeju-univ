@@ -172,10 +172,14 @@ function teamKey(){return ({'팀 1':'team1','팀 2':'team2','팀 3':'team3'})[st
 function supaClient(){if(!SUPA.sb&&SUPA_ENABLED&&typeof window.supabase!=='undefined')SUPA.sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON);return SUPA.sb;}
 const SUPA_ENABLED = /^https:\/\/.+\.supabase\.co/.test(SUPABASE_URL) && SUPABASE_ANON.length>20;
 const SHARED=['members','clusters','themeNotes','themeVotes','selectedTheme','subtopic','subReason','teamName','teamTopic','ideaMemo','checks'];
-let applyingRemote=false, syncT=null;
+let applyingRemote=false, syncT=null, suppressUntil=0;
+function now(){return Date.now();}
 function serialize(){const o={};SHARED.forEach(k=>o[k]=state[k]);return JSON.parse(JSON.stringify(o));}
 function applyRemote(data){if(!data)return;applyingRemote=true;SHARED.forEach(k=>{if(data[k]!==undefined)state[k]=data[k];});if(state.loggedIn)render();applyingRemote=false;}
-function scheduleSync(){if(!SUPA.connected||applyingRemote)return;clearTimeout(syncT);syncT=setTimeout(pushState,300);}
+function onRemoteReset(fresh){clearTimeout(syncT);suppressUntil=now()+1800;applyingRemote=true;
+  const f=fresh||freshShared();SHARED.forEach(k=>{state[k]=(f[k]!==undefined?f[k]:state[k]);});
+  if(state.loggedIn&&!state.adminMode)render();applyingRemote=false;}
+function scheduleSync(){if(!SUPA.connected||applyingRemote||now()<suppressUntil)return;clearTimeout(syncT);syncT=setTimeout(pushState,300);}
 async function pushState(){try{if(!SUPA.connected)return;const s=serialize();const key=teamKey();
   if(SUPA.room)await SUPA.room.send({type:'broadcast',event:'state',payload:{state:s}});
   const {error}=await SUPA.sb.from('workspaces').upsert({team_code:key,state:s});
@@ -196,6 +200,7 @@ async function joinRoom(){
       let done=false;
       SUPA.room=SUPA.sb.channel('room-'+key,{config:{broadcast:{self:false}}});
       SUPA.room.on('broadcast',{event:'state'},({payload})=>applyRemote(payload.state))
+        .on('broadcast',{event:'reset'},({payload})=>onRemoteReset(payload&&payload.state))
         .subscribe((status,err)=>{
           console.log('[join] realtime status:',status,err||'');
           if(status==='SUBSCRIBED'){SUPA.connected=true;if(state.loggedIn)renderUserbar();if(!done){done=true;resolve({ok:true});}}
@@ -603,6 +608,7 @@ function progressOf(st){let n=0;
   if(st.selectedTheme)n++; if(st.subtopic)n++; if(st.teamTopic)n++;
   return n;}
 async function adminLoad(){
+  if(now()<adminSuppressLoadUntil)return;   // 초기화 직후 잠시 재로딩 보류
   const sb=supaClient(); if(!sb)return;
   try{const {data,error}=await sb.from('workspaces').select('team_code,state');
     if(error){console.warn('[admin] load',error.message);return;}
@@ -646,10 +652,22 @@ function adminAddMember(k){const st=state._admin[k]||(state._admin[k]=freshShare
 function adminDelMember(k,i){const st=state._admin[k];if(!st||!st.members)return;st.members.splice(i,1);adminPush(k);renderAdmin();}
 function askReset(k){state.adminConfirm=k;renderAdmin();}
 function cancelReset(){state.adminConfirm=null;renderAdmin();}
-function doReset(k){
-  if(k==='__all__'){TEAM_KEYS.forEach(t=>{state._admin[t]=freshShared();adminPush(t);});}
-  else{state._admin[k]=freshShared();adminPush(k);}
-  state.adminConfirm=null;renderAdmin();
+let adminSuppressLoadUntil=0;
+async function doReset(k){
+  const targets=k==='__all__'?TEAM_KEYS.slice():[k];
+  state.adminConfirm=null;
+  for(const t of targets){
+    const fresh=freshShared();
+    state._admin[t]=fresh;
+    // 참여자에게 전용 reset 신호 — 대기 중 저장 취소 + 화면 즉시 비움
+    try{const ch=SUPA.adminChans.find(c=>c&&c.topic&&String(c.topic).indexOf('room-'+t)>=0);
+      if(ch)ch.send({type:'broadcast',event:'reset',payload:{state:fresh}});}catch(e){console.warn('[reset bc]',e);}
+    // DB에 초기화 상태 확실히 저장(대기)
+    if(SUPA.sb){try{const {error}=await SUPA.sb.from('workspaces').upsert({team_code:t,state:fresh});
+      if(error)console.warn('[reset] DB 저장 실패(RLS/테이블 확인):',error.message);}catch(e){console.warn('[reset]',e);}}
+  }
+  adminSuppressLoadUntil=now()+5000; // 초기화 직후 폴링이 옛 데이터를 되살리지 않도록 잠시 보류
+  renderAdmin();
 }
 function manageHTML(k){const st=state._admin[k]||{};const ms=st.members||[];
   let h=`<div style="margin-top:12px;background:var(--sea);border:1px solid var(--line);border-radius:10px;padding:14px">
