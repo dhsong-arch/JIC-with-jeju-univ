@@ -164,8 +164,12 @@
 const SUPABASE_URL  = "https://ftfxnfimfiwkgcejgeuq.supabase.co";   // base URL만 (뒤에 /rest/v1/ 붙이지 말 것)
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0ZnhuZmltZml3a2djZWpnZXVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5MjExODcsImV4cCI6MjA5OTQ5NzE4N30.bwgRjmIYLG8Xxvra7_FZS0j8SqAPaAtqzBYfvNKYbpg";
 
-const SUPA={sb:null,room:null,connected:false,reason:null};
+const ADMIN_CODE = "";   // 관리자 코드(선택). 비워두면 코드 없이 입장, 값을 넣으면 그 코드를 입력해야 입장.
+const TEAM_LABEL = {team1:"팀 1",team2:"팀 2",team3:"팀 3"};
+const TEAM_KEYS = ["team1","team2","team3"];
+const SUPA={sb:null,room:null,connected:false,reason:null,adminChans:[],adminTimer:null};
 function teamKey(){return ({'팀 1':'team1','팀 2':'team2','팀 3':'team3'})[state.user.team]||('team_'+String(state.user.team||'x').replace(/[^A-Za-z0-9]+/g,'_'));}
+function supaClient(){if(!SUPA.sb&&SUPA_ENABLED&&typeof window.supabase!=='undefined')SUPA.sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON);return SUPA.sb;}
 const SUPA_ENABLED = /^https:\/\/.+\.supabase\.co/.test(SUPABASE_URL) && SUPABASE_ANON.length>20;
 const SHARED=['members','clusters','themeNotes','themeVotes','selectedTheme','subtopic','subReason','teamName','teamTopic','ideaMemo','checks'];
 let applyingRemote=false, syncT=null;
@@ -270,7 +274,8 @@ function aiRecommendTheme(members){
 const state={loggedIn:false,user:{name:"",team:""},step:0,
   members:[m(),m(),m(),m()],clusters:[c(),c(),c()],
   themeNotes:{},themeVotes:{},selectedTheme:null,aiThemeRank:null,aiCommon:null,
-  subtopic:"",subReason:"",teamName:"",teamTopic:"",ideaMemo:"",aiIdeaList:null,checks:[false,false,false,false,false]};
+  subtopic:"",subReason:"",teamName:"",teamTopic:"",ideaMemo:"",aiIdeaList:null,checks:[false,false,false,false,false],
+  adminMode:false,adminAuthed:false,adminGate:false,_admin:{},adminOpen:{}};
 THEMES.forEach(t=>{state.themeNotes[t.key]="";state.themeVotes[t.key]=0;});
 function m(){return {name:"",problem:"",idea:"",keywords:[],kwSuggest:null,rolePart:"",roleLink:"",isMe:false}}
 function c(){return {label:"",members:""}}
@@ -299,6 +304,7 @@ function phead(i){const st=STEPS[i];return `<div class="phead"><div class="ptitl
 
 /* ===== render root ===== */
 function render(){
+  if(state.adminMode){$("#stepper").classList.add("hidden");return renderAdmin();}
   if(!state.loggedIn){$("#userbar").classList.add("hidden");$("#stepper").classList.add("hidden");return renderLogin();}
   $("#userbar").classList.remove("hidden");$("#stepper").classList.remove("hidden");
   renderUserbar();renderStepper();
@@ -330,7 +336,32 @@ function renderLogin(){
     <div class="note" id="loginNote">${SUPA_ENABLED
       ? "🟢 실시간 동시편집이 활성화되어 있습니다. 같은 팀으로 입장한 사람끼리 화면이 동기화됩니다."
       : "🔗 로컬 모드 — 여러 기기 실시간 동기화는 코드 상단 SUPABASE_URL·ANON_KEY를 채우면 켜집니다."}</div>
+    <div style="text-align:center;margin-top:14px"><a href="#" onclick="enterAdmin();return false" style="color:var(--muted);font-size:13px;font-weight:700;text-decoration:none">🛠 관리자 스페이스 →</a></div>
+    <div id="adminGate">${state.adminGate?adminGateHTML():""}</div>
   </div></div>`;
+}
+function adminGateHTML(){
+  return `<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:14px">
+    <label class="fl">관리자 코드</label>
+    <input type="password" id="adminCodeIn" placeholder="관리자 코드 입력" onkeydown="if(event.key==='Enter')verifyAdmin()">
+    <button class="btn ghost" style="width:100%;margin-top:10px" onclick="verifyAdmin()">관리자 스페이스 입장</button>
+    <div id="adminGateMsg" style="color:#c0392b;font-size:12.5px;margin-top:6px"></div></div>`;
+}
+function enterAdmin(){
+  if(!SUPA_ENABLED){const n=$("#loginNote");if(n){n.textContent="관리자 스페이스는 Supabase 연결이 필요합니다. 코드 상단 URL·ANON_KEY를 채워주세요.";n.style.color="#c0392b";}return;}
+  if(ADMIN_CODE){state.adminGate=true;renderLogin();setTimeout(()=>{const el=$("#adminCodeIn");if(el)el.focus();},50);return;}
+  openAdmin();
+}
+function verifyAdmin(){
+  const el=$("#adminCodeIn");const v=el?el.value:"";
+  if(v!==ADMIN_CODE){const m=$("#adminGateMsg");if(m)m.textContent="코드가 올바르지 않습니다.";return;}
+  openAdmin();
+}
+function openAdmin(){
+  state.adminGate=false;state.adminMode=true;state.loggedIn=true;
+  $("#userbar").classList.remove("hidden");
+  render();
+  adminConnect();
 }
 function pickTeam(t){const nm=$("#loginName");if(nm)state.user.name=nm.value;state.user.team=t;renderLogin();$("#loginName").focus();}
 async function doLogin(){
@@ -560,52 +591,127 @@ function copySummary(){const th=state.selectedTheme||"—";const kw=state.cluste
   t+=`\n■ 아이디어\n${state.ideaMemo||'—'}\n\n■ 체크리스트\n`;CHECKS.forEach((c,i)=>{t+=`${state.checks[i]?'[v]':'[ ]'} ${c}\n`;});
   navigator.clipboard.writeText(t).then(()=>{const b=$("#copybtn");b.textContent="✓ 복사됨";setTimeout(()=>b.textContent="📋 요약 복사",1500);}).catch(()=>{});}
 
-/* ===== 전체 과정 리포트 HTML ===== */
-function reportHTML(){
-  const th=state.selectedTheme||'—';
-  const kw=state.clusters.filter(c=>c.label).map(c=>c.label).join(' · ')||'—';
+/* ===== 관리자 스페이스 ===== */
+function buildStateFor(k){const st=state._admin[k]||{};
+  return Object.assign({members:[],clusters:[],themeVotes:{},checks:[],selectedTheme:null,subtopic:"",subReason:"",teamName:"",teamTopic:"",ideaMemo:""},st,{user:{team:TEAM_LABEL[k]}});}
+function progressOf(st){let n=0;
+  if((st.members||[]).some(m=>m.idea||m.problem))n++;
+  if((st.members||[]).some(m=>(m.keywords||[]).length)||(st.clusters||[]).some(c=>c.label))n++;
+  if(st.selectedTheme)n++; if(st.subtopic)n++; if(st.teamTopic)n++;
+  return n;}
+async function adminLoad(){
+  const sb=supaClient(); if(!sb)return;
+  try{const {data,error}=await sb.from('workspaces').select('team_code,state');
+    if(error){console.warn('[admin] load',error.message);return;}
+    (data||[]).forEach(r=>{if(r&&r.state)state._admin[r.team_code]=r.state;});
+    if(state.adminMode)renderAdmin();
+  }catch(e){console.warn('[admin]',e);}}
+function adminConnect(){
+  const sb=supaClient();
+  if(sb){
+    TEAM_KEYS.forEach(k=>{
+      const ch=sb.channel('room-'+k,{config:{broadcast:{self:false}}});
+      ch.on('broadcast',{event:'state'},({payload})=>{if(payload&&payload.state){state._admin[k]=payload.state;if(state.adminMode)renderAdmin();}}).subscribe();
+      SUPA.adminChans.push(ch);
+    });
+    adminLoad();
+    SUPA.adminTimer=setInterval(adminLoad,6000);
+  }
+}
+function exitAdmin(){
+  try{SUPA.adminChans.forEach(c=>SUPA.sb&&SUPA.sb.removeChannel(c));}catch(e){}
+  SUPA.adminChans=[];if(SUPA.adminTimer){clearInterval(SUPA.adminTimer);SUPA.adminTimer=null;}
+  state.adminMode=false;state.loggedIn=false;render();window.scrollTo({top:0});
+}
+function toggleTeam(k){state.adminOpen[k]=!state.adminOpen[k];renderAdmin();}
+function renderAdmin(){
+  $("#userbar").classList.remove("hidden");
+  $("#userbar").innerHTML=`<span class="who">🛠 <b>관리자 스페이스</b></span>
+    <span class="livehint">${SUPA.sb?'전체 팀 실시간 현황 · 6초마다 갱신':'연결 대기'}</span>
+    <button class="out" onclick="exitAdmin()">나가기</button>`;
+  const cards=TEAM_KEYS.map(k=>{
+    const st=state._admin[k];const label=TEAM_LABEL[k];
+    if(!st) return `<div class="panel" style="margin-top:12px"><div style="display:flex;justify-content:space-between;align-items:center">
+      <div><b style="font-size:17px">${label}</b> <span style="color:var(--muted);font-size:13px">· 아직 시작 전</span></div>
+      <span style="color:var(--muted);font-size:12px">데이터 없음</span></div></div>`;
+    const p=progressOf(st);const pct=Math.round(p/5*100);
+    const th=st.selectedTheme||'—';const names=(st.members||[]).filter(m=>m.name).map(m=>esc(m.name)).join(', ')||'—';
+    const open=state.adminOpen[k];
+    return `<div class="panel" style="margin-top:12px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
+        <div style="flex:1;min-width:220px">
+          <div><b style="font-size:18px">${esc(st.teamName||label)}</b> <span style="color:var(--muted);font-size:13px">· ${label}</span></div>
+          <div style="font-size:13px;color:var(--muted);margin-top:3px">참여: ${names}</div>
+          <div style="margin-top:8px;font-size:13.5px"><b style="color:var(--tan-dk)">${esc(th)}</b> ${st.subtopic?('› '+esc(st.subtopic)):''}</div>
+          <div style="font-size:14px;margin-top:2px">${esc(st.teamTopic||'<span style=color:#b3a48f>팀 주제 미정</span>')}</div>
+        </div>
+        <div style="text-align:right;min-width:150px">
+          <div style="font-size:12px;color:var(--muted)">진행 ${p}/5</div>
+          <div style="background:var(--sea2);border-radius:8px;height:8px;width:150px;margin:5px 0;overflow:hidden"><div style="background:var(--tan);height:100%;width:${pct}%"></div></div>
+          <button class="btn ghost" style="padding:6px 12px;font-size:12.5px" onclick="toggleTeam('${k}')">${open?'접기':'상세'}</button>
+          <button class="btn tan" style="padding:6px 12px;font-size:12.5px" id="pdf_${k}" onclick="savePDFTeam('${k}')">PDF</button>
+        </div>
+      </div>
+      ${open?`<div style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">${reportHTML(buildStateFor(k))}</div>`:''}
+    </div>`;
+  }).join("");
+  view.innerHTML=`<div class="panel" style="margin-bottom:0">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+        <div><h2 style="font-size:22px">전체 팀 현황</h2><div style="color:var(--muted);font-size:13px">3개 팀의 진행 상황과 결과를 실시간으로 확인합니다.</div></div>
+        <button class="btn ghost" onclick="adminLoad()">↻ 새로고침</button></div>
+    </div>${cards}`;
+}
+
+/* ===== 전체 과정 리포트 HTML (st: 특정 팀 상태, 없으면 현재) ===== */
+function reportHTML(st){st=st||state;
+  const members=st.members||[],clusters=st.clusters||[],votes=st.themeVotes||{},checks=st.checks||[];
+  const teamLabel=(st.user&&st.user.team)||'';
+  const th=st.selectedTheme||'—';
+  const kw=clusters.filter(c=>c.label).map(c=>c.label).join(' · ')||'—';
   const H=(t)=>`<div style="font-size:15px;font-weight:700;color:#5A4A42;margin:18px 0 6px;border-bottom:2px solid #FEE500;padding-bottom:4px">${t}</div>`;
   const nm=(m,i)=>esc(m.name||('팀원'+(i+1)));
   let h=`<div style="font-family:'Malgun Gothic','Noto Sans KR',sans-serif;color:#2E2622;line-height:1.6">`;
   h+=`<div style="background:#3A2E28;color:#fff;border-radius:10px;padding:16px 18px;margin-bottom:8px">
-      <div style="color:#E8712B;font-weight:700;font-size:13px">역방향 팀빌딩 전체 과정 · ${esc(state.teamName||'(팀명 미정)')} · ${esc(state.user.team||'')}</div>
-      <div style="font-size:12px;color:#E4D3BE;margin:6px 0">세부내용 → ${esc(kw)} → 대주제 ${esc(th)} → 소주제 ${esc(state.subtopic||'—')} → 팀 주제</div>
-      <div style="font-size:18px;font-weight:700">${esc(state.teamTopic||'—')}</div></div>`;
+      <div style="color:#E8712B;font-weight:700;font-size:13px">역방향 팀빌딩 전체 과정 · ${esc(st.teamName||'(팀명 미정)')} · ${esc(teamLabel)}</div>
+      <div style="font-size:12px;color:#E4D3BE;margin:6px 0">세부내용 → ${esc(kw)} → 대주제 ${esc(th)} → 소주제 ${esc(st.subtopic||'—')} → 팀 주제</div>
+      <div style="font-size:18px;font-weight:700">${esc(st.teamTopic||'—')}</div></div>`;
   h+=H('STEP 1 · 개인 문제와 아이디어');
   h+=`<table style="width:100%;border-collapse:collapse;font-size:12px"><tr style="background:#5A4A42;color:#fff"><td style="padding:7px;width:16%">이름</td><td style="padding:7px">해결하고 싶은 문제</td><td style="padding:7px">해결 아이디어</td></tr>`;
-  state.members.forEach((m,i)=>{h+=`<tr><td style="border:1px solid #EADFC4;padding:7px;font-weight:700">${nm(m,i)}</td><td style="border:1px solid #EADFC4;padding:7px">${esc(m.problem||'—')}</td><td style="border:1px solid #EADFC4;padding:7px">${esc(m.idea||'—')}</td></tr>`;});
+  members.forEach((m,i)=>{h+=`<tr><td style="border:1px solid #EADFC4;padding:7px;font-weight:700">${nm(m,i)}</td><td style="border:1px solid #EADFC4;padding:7px">${esc(m.problem||'—')}</td><td style="border:1px solid #EADFC4;padding:7px">${esc(m.idea||'—')}</td></tr>`;});
   h+=`</table>`;
   h+=H('STEP 2 · 키워드 & 공통 키워드');
   h+=`<div style="font-size:12px">`;
-  state.members.forEach((m,i)=>{h+=`<div style="margin:2px 0"><b>${nm(m,i)}</b>: ${esc((m.keywords||[]).join(', ')||'—')}</div>`;});
-  const cl=state.clusters.filter(c=>c.label);
+  members.forEach((m,i)=>{h+=`<div style="margin:2px 0"><b>${nm(m,i)}</b>: ${esc((m.keywords||[]).join(', ')||'—')}</div>`;});
+  const cl=clusters.filter(c=>c.label);
   if(cl.length){h+=`<div style="margin-top:8px;font-weight:700">공통 키워드 묶음</div>`;cl.forEach(c=>{h+=`<div style="margin:2px 0">• <b>${esc(c.label)}</b>${c.members?` <span style="color:#8A7F72">(${esc(c.members)})</span>`:''}</div>`;});}
   h+=`</div>`;
   h+=H('STEP 3 · 대주제 선정 (투표 결과)');
   h+=`<div style="font-size:12px">`;
-  THEMES.forEach(t=>{const sel=state.selectedTheme===t.key;h+=`<div style="margin:3px 0">${sel?'✅ ':'▫️ '}<b>${esc(t.key)}</b> — ${state.themeVotes[t.key]||0}표${sel?' <span style="color:#E8712B;font-weight:700">← 선정</span>':''}</div>`;});
+  THEMES.forEach(t=>{const sel=st.selectedTheme===t.key;h+=`<div style="margin:3px 0">${sel?'✅ ':'▫️ '}<b>${esc(t.key)}</b> — ${votes[t.key]||0}표${sel?' <span style="color:#E8712B;font-weight:700">← 선정</span>':''}</div>`;});
   h+=`</div>`;
   h+=H('STEP 4 · 소주제');
-  h+=`<div style="font-size:12px"><b style="color:#CE5E1E">${esc(state.subtopic||'—')}</b>${state.subReason?`<div style="color:#8A7F72;margin-top:3px">이유: ${esc(state.subReason)}</div>`:''}</div>`;
+  h+=`<div style="font-size:12px"><b style="color:#CE5E1E">${esc(st.subtopic||'—')}</b>${st.subReason?`<div style="color:#8A7F72;margin-top:3px">이유: ${esc(st.subReason)}</div>`:''}</div>`;
   h+=H('STEP 5 · 팀명 · 팀 주제 · 역할 분배');
-  h+=`<div style="font-size:12px;margin-bottom:5px">팀명 <b>${esc(state.teamName||'—')}</b> · 팀 주제 <b>${esc(state.teamTopic||'—')}</b></div>`;
+  h+=`<div style="font-size:12px;margin-bottom:5px">팀명 <b>${esc(st.teamName||'—')}</b> · 팀 주제 <b>${esc(st.teamTopic||'—')}</b></div>`;
   h+=`<table style="width:100%;border-collapse:collapse;font-size:12px"><tr style="background:#8A7A6E;color:#fff"><td style="padding:7px;width:16%">이름</td><td style="padding:7px">맡을 부분</td><td style="padding:7px">아이디어 연결</td></tr>`;
-  state.members.forEach((m,i)=>{h+=`<tr><td style="border:1px solid #EADFC4;padding:7px;font-weight:700">${nm(m,i)}</td><td style="border:1px solid #EADFC4;padding:7px">${esc(m.rolePart||'—')}</td><td style="border:1px solid #EADFC4;padding:7px">${esc(m.roleLink||'—')}</td></tr>`;});
+  members.forEach((m,i)=>{h+=`<tr><td style="border:1px solid #EADFC4;padding:7px;font-weight:700">${nm(m,i)}</td><td style="border:1px solid #EADFC4;padding:7px">${esc(m.rolePart||'—')}</td><td style="border:1px solid #EADFC4;padding:7px">${esc(m.roleLink||'—')}</td></tr>`;});
   h+=`</table>`;
   h+=H('아이디어 도출');
-  h+=`<div style="font-size:12px;white-space:pre-wrap">${esc(state.ideaMemo||'—')}</div>`;
+  h+=`<div style="font-size:12px;white-space:pre-wrap">${esc(st.ideaMemo||'—')}</div>`;
   h+=H('확정 체크리스트');
-  h+=`<div style="font-size:12px">`;CHECKS.forEach((c,i)=>{h+=`<div style="margin:2px 0">${state.checks[i]?'☑':'☐'} ${esc(c)}</div>`;});h+=`</div>`;
+  h+=`<div style="font-size:12px">`;CHECKS.forEach((c,i)=>{h+=`<div style="margin:2px 0">${checks[i]?'☑':'☐'} ${esc(c)}</div>`;});h+=`</div>`;
   h+=`</div>`;
   return h;
 }
 /* ===== 전체 과정 PDF 저장 ===== */
-async function savePDF(){
-  const btn=$("#pdfbtn");
-  const fname=(state.teamName||state.user.team||'팀')+'_역방향팀빌딩_전체과정.pdf';
+async function savePDFTeam(k){return savePDF(buildStateFor(k),k);}
+async function savePDF(st,btnId){st=st||state;
+  const btn=$("#"+(btnId?('pdf_'+btnId):'pdfbtn'));
+  const fname=(st.teamName||(st.user&&st.user.team)||'팀')+'_역방향팀빌딩_전체과정.pdf';
+  const orig=btn?btn.textContent:'';
   const wrap=document.createElement('div');
   wrap.style.cssText='position:absolute;left:-99999px;top:0;width:760px;background:#fff;padding:30px;box-sizing:border-box';
-  wrap.innerHTML=reportHTML();document.body.appendChild(wrap);
+  wrap.innerHTML=reportHTML(st);document.body.appendChild(wrap);
   try{
     if(typeof window.html2canvas==='function'&&window.jspdf&&window.jspdf.jsPDF){
       if(btn){btn.textContent="저장 중…";btn.disabled=true;}
@@ -618,11 +724,11 @@ async function savePDF(){
       pdf.save(fname);
     } else {
       const w=window.open('','_blank');
-      if(w){w.document.write('<html><head><meta charset="utf-8"><title>'+fname+'</title></head><body>'+reportHTML()+'</body></html>');w.document.close();w.focus();setTimeout(()=>w.print(),300);}
+      if(w){w.document.write('<html><head><meta charset="utf-8"><title>'+fname+'</title></head><body>'+reportHTML(st)+'</body></html>');w.document.close();w.focus();setTimeout(()=>w.print(),300);}
       else window.print();
     }
   }catch(e){console.warn('pdf',e);window.print();}
-  finally{document.body.removeChild(wrap);if(btn){btn.textContent="📄 전체 과정 PDF 저장";btn.disabled=false;}}
+  finally{document.body.removeChild(wrap);if(btn){btn.textContent=orig||"📄 전체 과정 PDF 저장";btn.disabled=false;}}
 }
 /* ===== 실시간 동기화 트리거(위임 리스너) ===== */
 document.addEventListener('input',scheduleSync,true);
