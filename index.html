@@ -251,12 +251,22 @@ const CLUSTER_LABEL={이동성:"이동·교통 접근성",도로안전:"도로·
 const CLUSTER_THEME={이동성:"지역 불균형",도로안전:"지역 불균형",의료교육:"지역 불균형",환경:"기후위기",기후에너지:"기후위기",관광체류:"지역경제",경제창업:"지역경제",인구돌봄:"인구문제"};
 const JOSA=/(으로|로써|로서|에서|에게|한테|까지|부터|처럼|만큼|이라는|라는|이라고|라고|이나|은|는|이|가|을|를|에|와|과|도|의|만|들|한|할|해|했|와의|과의)$/;
 
+// 동사·형용사 활용형(예: 차지하는, 보이는, 해결하는, 필요한) 걸러내기 — 명사 위주만 남김
+const VERB_END=/(하는|되는|시키는|스러운|로운|다운|같은|보이는|없는|있는|지는|이는|리는|기는|하여|되어|해야|돼야|하기|되기)$/;
+function looksVerb(w){
+  if(!w)return true;
+  if(VERB_END.test(w))return true;
+  if(/(하|되)$/.test(w)&&w.length>=2)return true;                 // 차지하, 해결되 등 어간
+  if(/(한|할|해|했|된|될|됨|함|는|은|던|게|서|고|며|음)$/.test(w)&&w.length>=3)return true;
+  return false;
+}
+function nounish(arr){return (arr||[]).filter(w=>w&&!looksVerb(w));}
 function aiExtractKeywords(text){
   text=(text||"");
-  const hits=LEX.filter(t=>text.includes(t));
+  const hits=LEX.filter(t=>text.includes(t));   // 사전 등록어(모두 명사)는 그대로 신뢰
   const toks=text.split(/[^가-힣A-Za-z0-9]+/).filter(Boolean);
   const gen=[];
-  toks.forEach(w=>{let s=w.replace(JOSA,"");if(s.length>=2&&s.length<=6&&!STOP.includes(s)&&!hits.includes(s)&&!gen.includes(s))gen.push(s);});
+  toks.forEach(w=>{let s=w.replace(JOSA,"");if(s.length>=2&&s.length<=6&&!STOP.includes(s)&&!hits.includes(s)&&!gen.includes(s)&&!looksVerb(s))gen.push(s);});
   return [...new Set([...hits,...gen])].slice(0,8);
 }
 function clusterOf(kw){for(const k in SYN){if(SYN[k].some(t=>kw.includes(t)||t.includes(kw)))return k;}return null;}
@@ -463,8 +473,8 @@ function drawChips(idx){const c=$("#chips"+idx);if(!c)return;c.innerHTML=state.m
 async function aiKw(idx){const m=state.members[idx];
   const off=()=>aiExtractKeywords((m.problem||"")+" "+(m.idea||""));   // 문제+아이디어 둘 다 사용
   const box=$("#sugg"+idx);if(box)box.innerHTML='<div class="ailabel">✨ AI 추천 생성 중…</div>';
-  try{const r=await aiCall('keywords',{problem:m.problem||"",idea:m.idea||""});m.kwSuggest=(Array.isArray(r)&&r.length)?r:off();}
-  catch(e){m.kwSuggest=off();}
+  try{const r=await aiCall('keywords',{problem:m.problem||"",idea:m.idea||""});m.kwSuggest=nounish((Array.isArray(r)&&r.length)?r:off());}
+  catch(e){m.kwSuggest=nounish(off());}
   drawSugg(idx);}
 function drawSugg(idx){const box=$("#sugg"+idx);if(!box)return;const m=state.members[idx];
   if(!m.kwSuggest){box.innerHTML="";return;}
