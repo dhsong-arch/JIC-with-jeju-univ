@@ -230,8 +230,10 @@ async function aiCall(task,payload){
   const sb=supaClient();
   if(!USE_REMOTE_AI||!sb) throw new Error('local');
   const {data,error}=await sb.functions.invoke('ai-suggest',{body:{task,payload}});
-  if(error){console.warn('[ai-suggest] 함수 호출 실패(함수 이름/배포/JWT 확인):',error.message||error);throw error;}
-  if(!data||data.error||data.result===undefined){console.warn('[ai-suggest] 함수가 오류 반환:',(data&&(data.error||data.raw))||'no result');throw new Error((data&&data.error)||'no result');}
+  if(error){let detail=error.message||String(error);
+    try{if(error.context&&error.context.text){const t=await error.context.text();detail=t||detail;}}catch(_){}
+    console.warn('[ai-suggest] 함수 호출 실패:',detail);throw error;}
+  if(!data||data.error||data.result===undefined){console.warn('[ai-suggest] 원인:',(data&&(data.error||data.raw))||'no result');throw new Error((data&&data.error)||'no result');}
   return data.result;
 }
 /* ===== offline AI engine (fallback) ===== */
