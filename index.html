@@ -146,7 +146,7 @@
     <div class="kicker">2026 JIC With Jeju Univ.· 팀빌딩</div>
     <h1>개인의 문제에서 팀의 주제로</h1>
     <div class="flowline">세부내용 → 소주제(키워드) → <b>대주제</b> → 소주제 → 세부내용</div>
-
+    <div class="meta"><span>90분</span><span>4명 × 3팀</span><span>현장 진행용</span></div>
     <div id="userbar" class="hidden"></div>
   </div>
 </header>
@@ -473,25 +473,26 @@ function drawChips(idx){const c=$("#chips"+idx);if(!c)return;c.innerHTML=state.m
 async function aiKw(idx){const m=state.members[idx];
   const off=()=>aiExtractKeywords((m.problem||"")+" "+(m.idea||""));   // 문제+아이디어 둘 다 사용
   const box=$("#sugg"+idx);if(box)box.innerHTML='<div class="ailabel">✨ AI 추천 생성 중…</div>';
-  try{const r=await aiCall('keywords',{problem:m.problem||"",idea:m.idea||""});m.kwSuggest=nounish((Array.isArray(r)&&r.length)?r:off());}
-  catch(e){m.kwSuggest=nounish(off());}
+  try{const r=await aiCall('keywords',{problem:m.problem||"",idea:m.idea||""});m.kwSuggest=nounish((Array.isArray(r)&&r.length)?r:off());m._aiSrc='ai';}
+  catch(e){m.kwSuggest=nounish(off());m._aiSrc='off';}
   drawSugg(idx);}
+function srcLabel(s){return s==='ai'?'✨ Gemini 추천':'💡 오프라인 추천';}
 function drawSugg(idx){const box=$("#sugg"+idx);if(!box)return;const m=state.members[idx];
   if(!m.kwSuggest){box.innerHTML="";return;}
   const fresh=m.kwSuggest.filter(k=>!m.keywords.includes(k));
-  box.innerHTML=`<div class="ailabel">✨ AI 추천 키워드 — 클릭해서 채택${fresh.length?"":" (모두 채택됨)"}</div>
+  box.innerHTML=`<div class="ailabel">${srcLabel(m._aiSrc)} 키워드 — 클릭해서 채택${fresh.length?"":" (모두 채택됨)"}</div>
     <div class="chips">${fresh.map(k=>`<span class="chip ai" onclick="adoptKw(${idx},'${esc(k)}')">+ ${esc(k)}</span>`).join("")||'<span style="font-size:12px;color:var(--muted)">추천 키워드가 모두 반영되었습니다.</span>'}</div>`;}
 function adoptKw(idx,k){if(!state.members[idx].keywords.includes(k))state.members[idx].keywords.push(k);drawChips(idx);drawSugg(idx);
   const inp=$("#kwextract").querySelectorAll("input")[idx];if(inp)inp.value=state.members[idx].keywords.join(", ");}
 async function runAiCommon(){const off=()=>aiCommonKeywords(state.members);
   const box=$("#aicommon");if(box)box.innerHTML='<div class="ailabel" style="margin-top:8px">✨ AI 공통 키워드 생성 중…</div>';
-  try{const r=await aiCall('common',{members:state.members.map(m=>({name:m.name,keywords:m.keywords}))});state.aiCommon=(Array.isArray(r)&&r.length)?r:off();}
-  catch(e){state.aiCommon=off();}
+  try{const r=await aiCall('common',{members:state.members.map(m=>({name:m.name,keywords:m.keywords}))});state.aiCommon=(Array.isArray(r)&&r.length)?r:off();state.aiCommonSrc='ai';}
+  catch(e){state.aiCommon=off();state.aiCommonSrc='off';}
   renderAiCommon();}
 function renderAiCommon(){const box=$("#aicommon");if(!box)return;
   if(!state.aiCommon){box.innerHTML="";return;}
   if(!state.aiCommon.length){box.innerHTML=`<div class="aibanner">먼저 ① 에서 키워드를 입력/채택하면 공통 묶음을 제안할 수 있어요.</div>`;return;}
-  box.innerHTML=`<div class="ailabel" style="margin-top:8px">✨ AI 공통 키워드 3안 — '이 안 적용'으로 아래 직접 입력에 채웁니다</div>`+
+  box.innerHTML=`<div class="ailabel" style="margin-top:8px">${srcLabel(state.aiCommonSrc)} 공통 키워드 3안 — '이 안 적용'으로 아래 직접 입력에 채웁니다</div>`+
     state.aiCommon.map((s,i)=>`<div class="aicard"><div class="rank">${i+1}</div>
       <div class="body"><div class="lab">${esc(s.label)} <span style="color:var(--muted);font-weight:400;font-size:12px">(${esc(s.keys.join(', '))})</span></div>
       <div class="mem">관련 인원: ${esc(s.members.join(', '))||'—'}</div></div>
@@ -524,14 +525,14 @@ function renderStep3(){
 async function runAiTheme(){const off=()=>aiRecommendTheme(state.members);
   const box=$("#aitheme");if(box)box.innerHTML='<div class="aibanner">✨ AI 대주제 추천 생성 중…</div>';
   try{const r=await aiCall('theme',{members:state.members.map(m=>({name:m.name,keywords:m.keywords})),themes:THEMES.map(t=>({key:t.key,subs:t.subs}))});
-    state.aiThemeRank=(Array.isArray(r)&&r.length)?r:off();}
-  catch(e){state.aiThemeRank=off();}
+    state.aiThemeRank=(Array.isArray(r)&&r.length)?r:off();state.aiThemeSrc='ai';}
+  catch(e){state.aiThemeRank=off();state.aiThemeSrc='off';}
   renderAiTheme();renderThemes();}
 function renderAiTheme(){const box=$("#aitheme");if(!box)return;
   if(!state.aiThemeRank){box.innerHTML="";return;}
   const top=state.aiThemeRank.find(r=>r.n>0);
   if(!top){box.innerHTML=`<div class="aibanner">키워드가 부족해요. STEP 2에서 키워드를 채운 뒤 다시 추천해 주세요.</div>`;return;}
-  box.innerHTML=`<div class="aibanner">✨ <b>AI 추천 대주제: ${esc(top.theme)}</b> &nbsp;— 붙은 키워드: ${esc(top.keys.join(', '))}
+  box.innerHTML=`<div class="aibanner">${srcLabel(state.aiThemeSrc)} <b>추천 대주제: ${esc(top.theme)}</b> &nbsp;— 붙은 키워드: ${esc((top.keys||[]).join(', '))}
     <div style="margin-top:6px;font-size:12.5px;color:#6b5ca5">전체 점수: ${state.aiThemeRank.filter(r=>r.n>0).map(r=>esc(r.theme)+' '+r.n).join(' · ')}</div></div>`;}
 function renderThemes(){const box=$("#themes");box.innerHTML="";
   const maxV=Math.max(...THEMES.map(t=>state.themeVotes[t.key]),0);
@@ -618,15 +619,19 @@ async function runAiIdeas(){const off=()=>aiIdeas(state);
   const box=$("#ideaSugg");if(box)box.innerHTML='<div class="ailabel" style="margin-top:10px">✨ AI 아이디어 생성 중…</div>';
   try{const r=await aiCall('ideas',{theme:state.selectedTheme,subtopic:state.subtopic,
       keywords:state.clusters.filter(c=>c.label).map(c=>c.label),members:state.members.map(m=>({problem:m.problem,idea:m.idea}))});
-    state.aiIdeaList=(Array.isArray(r)&&r.length)?r:off();}
-  catch(e){state.aiIdeaList=off();}
+    state.aiIdeaList=(Array.isArray(r)&&r.length)?r:off();state.aiIdeaSrc='ai';}
+  catch(e){state.aiIdeaList=off();state.aiIdeaSrc='off';}
   renderIdeaSugg();}
+function ideaText(t){if(t&&typeof t==='object')return {title:t.title||'',desc:t.desc||t.title||''};return {title:'',desc:String(t)};}
 function renderIdeaSugg(){const box=$("#ideaSugg");if(!box)return;
   if(!state.aiIdeaList){box.innerHTML="";return;}
-  box.innerHTML=`<div class="ailabel" style="margin-top:10px">✨ AI 아이디어 3안 — '담기'로 메모에 추가</div>`+
-    state.aiIdeaList.map((t,i)=>`<div class="aicard"><div class="rank">${i+1}</div><div class="body"><div class="lab" style="font-weight:400;color:var(--ink)">${esc(t)}</div></div>
-    <button class="btn ghost" style="padding:8px 14px" onclick="addIdea(${i})">담기</button></div>`).join("");}
-function addIdea(i){const t=state.aiIdeaList[i];state.ideaMemo=(state.ideaMemo?state.ideaMemo+"\n":"")+"• "+t;const ta=$("#ideaMemo");if(ta)ta.value=state.ideaMemo;}
+  box.innerHTML=`<div class="ailabel" style="margin-top:10px">${srcLabel(state.aiIdeaSrc)} 아이디어 3안 — '담기'로 메모에 추가</div>`+
+    state.aiIdeaList.map((t,i)=>{const o=ideaText(t);return `<div class="aicard"><div class="rank">${i+1}</div><div class="body">
+      ${o.title?`<div class="lab">${esc(o.title)}</div>`:''}
+      <div style="font-size:13px;color:var(--muted);margin-top:${o.title?'2px':'0'}">${esc(o.desc)}</div></div>
+    <button class="btn ghost" style="padding:8px 14px;align-self:flex-start" onclick="addIdea(${i})">담기</button></div>`;}).join("");}
+function addIdea(i){const o=ideaText(state.aiIdeaList[i]);const line=(o.title?o.title+': ':'')+o.desc;
+  state.ideaMemo=(state.ideaMemo?state.ideaMemo+"\n":"")+"• "+line;const ta=$("#ideaMemo");if(ta)ta.value=state.ideaMemo;}
 function renderChecks(){const box=$("#checks");box.innerHTML="";CHECKS.forEach((c,i)=>{const d=document.createElement("div");
   d.className="check"+(state.checks[i]?" on":"");d.innerHTML=`<div class="box">${state.checks[i]?"✓":""}</div><span>${c}</span>`;
   d.onclick=()=>{state.checks[i]=!state.checks[i];renderChecks();};box.appendChild(d);});}
