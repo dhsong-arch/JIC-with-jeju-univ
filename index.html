@@ -478,7 +478,7 @@ async function aiKw(idx){const m=state.members[idx];
   try{const r=await aiCall('keywords',{problem:m.problem||"",idea:m.idea||""});m.kwSuggest=nounish((Array.isArray(r)&&r.length)?r:off());m._aiSrc='ai';}
   catch(e){m.kwSuggest=nounish(off());m._aiSrc='off';}
   drawSugg(idx);}
-function srcLabel(s){return s==='ai'?'✨ Gemini 추천':'💡 오프라인 추천';}
+function srcLabel(s){return s==='ai'?'✨ AI 추천':'💡 추천';}
 function drawSugg(idx){const box=$("#sugg"+idx);if(!box)return;const m=state.members[idx];
   if(!m.kwSuggest){box.innerHTML="";return;}
   const fresh=m.kwSuggest.filter(k=>!m.keywords.includes(k));
