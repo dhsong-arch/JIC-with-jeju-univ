@@ -584,10 +584,8 @@ function renderRoles(){const box=$("#roles");box.innerHTML="";
   state.members.forEach((mem,idx)=>{const d=document.createElement("div");d.style.marginBottom="10px";
     d.innerHTML=`<div style="display:flex;gap:10px;align-items:flex-start"><div class="mnum" style="margin-top:6px">${idx+1}</div>
       <div style="flex:1"><div style="font-weight:700;margin-bottom:4px">${esc(mem.name||('팀원 '+(idx+1)))}${isMine(mem)?' <span class="mebadge">나</span>':''}</div>
-      <div class="grid2"><input type="text" placeholder="맡을 부분" value="${esc(mem.rolePart||'')}" oninput="state.members[${idx}].rolePart=this.value">
-      <input type="text" placeholder="내 원래 아이디어와의 연결" value="${esc(mem.roleLink||'')}" oninput="state.members[${idx}].roleLink=this.value"></div></div></div>`;
-    box.appendChild(d);});}
-
+      <div class="grid2"><input type="text" placeholder="맡을 역할" value="${esc(mem.rolePart||'')}" oninput="state.members[${idx}].rolePart=this.value">
+      
 /* ===== result ===== */
 function renderResult(){
   const th=state.selectedTheme||"—";
@@ -609,7 +607,7 @@ function renderResult(){
       <div class="rbox"><h4>1분 피치 템플릿</h4><div class="pitch">우리 팀 <b>${esc(state.teamName||'___')}</b>은(는) <b>${esc(th)}</b>의 <b>${esc(state.subtopic||'___')}</b> 문제를 <b>${esc(topic)}</b>(으)로 해결한다.<br><br>핵심 아이디어를 4명이 나눠 맡는다.</div></div>
       <div class="rbox"><h4>확정 체크리스트</h4><div id="checks"></div></div></div>
     <div class="rbox" style="margin-top:14px"><h4>역할 · 지분</h4>
-      <table class="roletbl"><thead><tr><th style="width:22%">이름</th><th>맡을 부분</th><th style="width:34%">원래 아이디어와의 연결</th></tr></thead>
+      <table class="roletbl"><thead><tr><th style="width:22%">이름</th><th>맡을 역할</th><th style="width:34%">
       <tbody>${state.members.map(mm=>`<tr><td><b>${esc(mm.name||'—')}</b></td><td>${esc(mm.rolePart||'—')}</td><td>${esc(mm.roleLink||'—')}</td></tr>`).join("")}</tbody></table></div>
     <div class="navbtns"><button class="btn ghost" onclick="go(-1)">← 이전</button>
       <div style="display:flex;gap:10px"><button class="btn ghost" onclick="copySummary()" id="copybtn">📋 요약 복사</button><button class="btn tan" onclick="savePDF()" id="pdfbtn">📄 전체 과정 PDF 저장</button></div></div></div>`;
