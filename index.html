@@ -558,9 +558,7 @@ function renderStep4(){
   const th=THEMES.find(t=>t.key===state.selectedTheme);
   view.innerHTML=`<div class="panel">${phead(4)}
     <div class="prompt"><b>진행 발문</b> &nbsp;선정한 대주제 안에서, 우리 아이디어가 가장 많이 겹치는 소주제를 하나 입력 하세요.</div>
-
     <label class="fl">후보 소주제 — 하나를 입력 하세요</label>
-    <div class="chips" id="subchips"></div>
     <input type="text" placeholder="직접 입력 (예: 교통 사각지대 이동권)" style="margin-top:10px" value="${esc(state.subtopic)}" oninput="state.subtopic=this.value;renderSubChips()">
     <label class="fl" style="margin-top:16px">선택한 소주제 & 이유</label>
     <textarea placeholder="우리 팀이 이 소주제를 고른 이유는…" oninput="state.subReason=this.value">${esc(state.subReason)}</textarea>${nav(true)}</div>`;
