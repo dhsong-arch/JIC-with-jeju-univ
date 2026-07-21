@@ -567,8 +567,8 @@ function renderStep4(){
     <label class="fl">후보 소주제 — 하나를 직접 입력</label>
     <div class="chips" id="subchips"></div>
     <input type="text" placeholder="직접 입력 (예: 교통 사각지대 이동권)" style="margin-top:10px" value="${esc(state.subtopic)}" oninput="state.subtopic=this.value;renderSubChips()">
-    <label class="fl" style="margin-top:16px">선택한 소주제 & 이유</label>
-    <textarea placeholder="우리 팀이 이 소주제를 고른 이유는…" oninput="state.subReason=this.value">${esc(state.subReason)}</textarea>${nav(true)}</div>`;
+    <label class="fl" style="margin-top:16px">우리 팀이 해결하고자 하는 문제 & 이유</label>
+    <textarea placeholder="우리 팀이 이 해결하고자 하는 문제는…" oninput="state.subReason=this.value">${esc(state.subReason)}</textarea>${nav(true)}</div>`;
   renderSubChips();
 }
 function renderSubChips(){const th=THEMES.find(t=>t.key===state.selectedTheme);const box=$("#subchips");if(!box)return;
