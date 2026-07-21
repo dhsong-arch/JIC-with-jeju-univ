@@ -146,7 +146,7 @@
     <div class="kicker">2026 JIC With Jeju Univ.· 팀빌딩</div>
     <h1>개인의 문제에서 팀의 주제로</h1>
     <div class="flowline">세부내용 → 소주제(키워드) → <b>대주제</b> → 소주제 → 세부내용</div>
-
+    <div class="meta"><span>90분</span><span>4명 × 3팀</span><span>현장 진행용</span></div>
     <div id="userbar" class="hidden"></div>
   </div>
 </header>
@@ -281,7 +281,7 @@ function aiCommonKeywords(members){
 }
 const IDEA_BANK={
   "지역경제":["지역 자원을 활용한 {sub} 로컬 브랜드·창업 챌린지","방문객을 단골로 만드는 {sub} 체류형 서비스","데이터 기반 {kw} 상권·소상공인 매칭 플랫폼"],
-  "지역 불균형":["데이터로 {sub} 취약 지역을 지도화해 우선순위 개선","{kw} 기반 민·관·대학 협력 이동권 프로그램"],
+  "지역 불균형":["{sub} 사각지대를 잇는 수요응답형(DRT)·셔틀 파일럿","데이터로 {sub} 취약 지역을 지도화해 우선순위 개선","{kw} 기반 민·관·대학 협력 이동권 프로그램"],
   "인구문제":["주민·청년이 함께하는 {sub} 커뮤니티·돌봄 네트워크","{sub}를 완화하는 정주 인센티브·생활 공간","세대를 잇는 {kw} 연결 프로그램"],
   "기후위기":["{sub}를 줄이는 시민 참여형 리워드 캠페인","{kw} 순환(재활용·저탄소) 생활 인프라","관광지 대상 {sub} 저감 파일럿 존"],
 };
@@ -340,7 +340,7 @@ function render(){
   [renderIntro,renderStep1,renderStep2,renderStep3,renderStep4,renderStep5,renderResult][state.step]();
 }
 function renderUserbar(){
-  const stat=SUPA.connected?'🟢 온라인'
+  const stat=SUPA.connected?'🟢 실시간 연결됨 · 팀원과 동기화 중'
     :(SUPA_ENABLED?('🔴 실시간 연결 실패'+(SUPA.reason?'('+SUPA.reason+')':'')+' · 로컬로 진행'):'· 로컬 모드');
   $("#userbar").innerHTML=`<span class="who">👤 <b>${esc(state.user.name)}</b> · ${esc(state.user.team)}</span>
     <span class="livehint">${stat}</span>
@@ -478,7 +478,7 @@ async function aiKw(idx){const m=state.members[idx];
   try{const r=await aiCall('keywords',{problem:m.problem||"",idea:m.idea||""});m.kwSuggest=nounish((Array.isArray(r)&&r.length)?r:off());m._aiSrc='ai';}
   catch(e){m.kwSuggest=nounish(off());m._aiSrc='off';}
   drawSugg(idx);}
-function srcLabel(s){return s==='ai'?'✨ AI 추천':'💡 추천';}
+function srcLabel(s){return s==='ai'?'✨ Gemini 추천':'💡 오프라인 추천';}
 function drawSugg(idx){const box=$("#sugg"+idx);if(!box)return;const m=state.members[idx];
   if(!m.kwSuggest){box.innerHTML="";return;}
   const fresh=m.kwSuggest.filter(k=>!m.keywords.includes(k));
@@ -557,8 +557,10 @@ function renderStep4(){
   if(!state.selectedTheme){view.innerHTML=`<div class="panel">${phead(4)}<div class="prompt" style="background:#FDEDED"><b style="color:#c0392b">먼저 STEP 3에서 대주제를 선정해 주세요.</b></div>${nav(true)}</div>`;return;}
   const th=THEMES.find(t=>t.key===state.selectedTheme);
   view.innerHTML=`<div class="panel">${phead(4)}
-    <div class="prompt"><b>진행 발문</b> &nbsp;선정한 대주제 안에서, 우리 아이디어가 가장 많이 겹치는 소주제를 하나 입력 하세요.</div>
-    <label class="fl">후보 소주제 — 하나를 입력 하세요</label>
+    <div class="prompt"><b>진행 발문</b> &nbsp;선정한 대주제 안에서, 우리 아이디어가 가장 많이 겹치는 소주제를 하나 고르세요.</div>
+    <div class="idea-ref">선정한 대주제: <b style="color:var(--tan-dk)">${esc(th.key)}</b></div>
+    <label class="fl">후보 소주제 — 하나를 선택하거나 직접 입력</label>
+    <div class="chips" id="subchips"></div>
     <input type="text" placeholder="직접 입력 (예: 교통 사각지대 이동권)" style="margin-top:10px" value="${esc(state.subtopic)}" oninput="state.subtopic=this.value;renderSubChips()">
     <label class="fl" style="margin-top:16px">선택한 소주제 & 이유</label>
     <textarea placeholder="우리 팀이 이 소주제를 고른 이유는…" oninput="state.subReason=this.value">${esc(state.subReason)}</textarea>${nav(true)}</div>`;
@@ -584,8 +586,10 @@ function renderRoles(){const box=$("#roles");box.innerHTML="";
   state.members.forEach((mem,idx)=>{const d=document.createElement("div");d.style.marginBottom="10px";
     d.innerHTML=`<div style="display:flex;gap:10px;align-items:flex-start"><div class="mnum" style="margin-top:6px">${idx+1}</div>
       <div style="flex:1"><div style="font-weight:700;margin-bottom:4px">${esc(mem.name||('팀원 '+(idx+1)))}${isMine(mem)?' <span class="mebadge">나</span>':''}</div>
-      <div class="grid2"><input type="text" placeholder="맡을 역할" value="${esc(mem.rolePart||'')}" oninput="state.members[${idx}].rolePart=this.value">
-      
+      <div class="grid2"><input type="text" placeholder="맡을 부분" value="${esc(mem.rolePart||'')}" oninput="state.members[${idx}].rolePart=this.value">
+      <input type="text" placeholder="내 원래 아이디어와의 연결" value="${esc(mem.roleLink||'')}" oninput="state.members[${idx}].roleLink=this.value"></div></div></div>`;
+    box.appendChild(d);});}
+
 /* ===== result ===== */
 function renderResult(){
   const th=state.selectedTheme||"—";
@@ -607,7 +611,7 @@ function renderResult(){
       <div class="rbox"><h4>1분 피치 템플릿</h4><div class="pitch">우리 팀 <b>${esc(state.teamName||'___')}</b>은(는) <b>${esc(th)}</b>의 <b>${esc(state.subtopic||'___')}</b> 문제를 <b>${esc(topic)}</b>(으)로 해결한다.<br><br>핵심 아이디어를 4명이 나눠 맡는다.</div></div>
       <div class="rbox"><h4>확정 체크리스트</h4><div id="checks"></div></div></div>
     <div class="rbox" style="margin-top:14px"><h4>역할 · 지분</h4>
-      <table class="roletbl"><thead><tr><th style="width:22%">이름</th><th>맡을 역할</th><th style="width:34%">
+      <table class="roletbl"><thead><tr><th style="width:22%">이름</th><th>맡을 부분</th><th style="width:34%">원래 아이디어와의 연결</th></tr></thead>
       <tbody>${state.members.map(mm=>`<tr><td><b>${esc(mm.name||'—')}</b></td><td>${esc(mm.rolePart||'—')}</td><td>${esc(mm.roleLink||'—')}</td></tr>`).join("")}</tbody></table></div>
     <div class="navbtns"><button class="btn ghost" onclick="go(-1)">← 이전</button>
       <div style="display:flex;gap:10px"><button class="btn ghost" onclick="copySummary()" id="copybtn">📋 요약 복사</button><button class="btn tan" onclick="savePDF()" id="pdfbtn">📄 전체 과정 PDF 저장</button></div></div></div>`;
