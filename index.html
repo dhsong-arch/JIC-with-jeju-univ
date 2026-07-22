@@ -8,6 +8,27 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
+  /* 카카오 공식 폰트 (Kakao Small Sans) — 상업용 무료, 로드 실패 시 맑은 고딕으로 폴백 */
+  @font-face{font-family:'Kakao Small Sans';font-weight:300;font-style:normal;font-display:swap;
+    src:url('https://cdn.jsdelivr.net/gh/fonts-archive/KakaoSmallSans/KakaoSmallSans-Light.woff2') format('woff2'),
+        url('https://cdn.jsdelivr.net/gh/fonts-archive/KakaoSmallSans/KakaoSmallSans-Light.woff') format('woff');}
+  @font-face{font-family:'Kakao Small Sans';font-weight:400;font-style:normal;font-display:swap;
+    src:url('https://cdn.jsdelivr.net/gh/fonts-archive/KakaoSmallSans/KakaoSmallSans-Regular.woff2') format('woff2'),
+        url('https://cdn.jsdelivr.net/gh/fonts-archive/KakaoSmallSans/KakaoSmallSans-Regular.woff') format('woff');}
+  @font-face{font-family:'Kakao Small Sans';font-weight:700;font-style:normal;font-display:swap;
+    src:url('https://cdn.jsdelivr.net/gh/fonts-archive/KakaoSmallSans/KakaoSmallSans-Bold.woff2') format('woff2'),
+        url('https://cdn.jsdelivr.net/gh/fonts-archive/KakaoSmallSans/KakaoSmallSans-Bold.woff') format('woff');}
+  /* 제목용 카카오 큰글씨 (Kakao Big Sans) */
+  @font-face{font-family:'Kakao Big Sans';font-weight:400;font-style:normal;font-display:swap;
+    src:url('https://cdn.jsdelivr.net/gh/fonts-archive/KakaoBigSans/KakaoBigSans-Regular.woff2') format('woff2'),
+        url('https://cdn.jsdelivr.net/gh/fonts-archive/KakaoBigSans/KakaoBigSans-Regular.woff') format('woff');}
+  @font-face{font-family:'Kakao Big Sans';font-weight:700;font-style:normal;font-display:swap;
+    src:url('https://cdn.jsdelivr.net/gh/fonts-archive/KakaoBigSans/KakaoBigSans-Bold.woff2') format('woff2'),
+        url('https://cdn.jsdelivr.net/gh/fonts-archive/KakaoBigSans/KakaoBigSans-Bold.woff') format('woff');}
+  @font-face{font-family:'Kakao Big Sans';font-weight:800;font-style:normal;font-display:swap;
+    src:url('https://cdn.jsdelivr.net/gh/fonts-archive/KakaoBigSans/KakaoBigSans-ExtraBold.woff2') format('woff2'),
+        url('https://cdn.jsdelivr.net/gh/fonts-archive/KakaoBigSans/KakaoBigSans-ExtraBold.woff') format('woff');}
+  h1,h2,h3,.ptitle h2,.kicker{font-family:"Kakao Big Sans","Kakao Small Sans","Malgun Gothic","Noto Sans KR",sans-serif}
   :root{
     --ink:#2E2622; --ocean:#5A4A42; --ocean-dk:#3A2E28; --teal:#8A7A6E;
     --sea:#FFF8E1; --sea2:#FBEFD0; --tan:#E8712B; --tan-dk:#CE5E1E;
@@ -15,7 +36,7 @@
     --kakao:#FEE500; --kakaod:#F5D800; --red:#E8452F; --green:#6FA84B;
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:"Malgun Gothic","Noto Sans KR","Apple SD Gothic Neo",system-ui,sans-serif;
+  body{font-family:"Kakao Small Sans","Malgun Gothic","Noto Sans KR","Apple SD Gothic Neo",system-ui,sans-serif;
     color:var(--ink);background:var(--sea);line-height:1.55;-webkit-font-smoothing:antialiased}
   .wrap{max-width:1040px;margin:0 auto;padding:0 20px 80px}
   header{background:var(--kakao);color:var(--ink);padding:24px 0 20px;position:relative;overflow:hidden}
@@ -146,7 +167,6 @@
     <div class="kicker">2026 JIC With Jeju Univ.· 팀빌딩</div>
     <h1>개인의 문제에서 팀의 주제로</h1>
     <div class="flowline">세부내용 → 소주제(키워드) → <b>대주제</b> → 소주제 → 세부내용</div>
-  
     <div id="userbar" class="hidden"></div>
   </div>
 </header>
@@ -796,7 +816,7 @@ function reportHTML(st){st=st||state;
   const kw=clusters.filter(c=>c.label).map(c=>c.label).join(' · ')||'—';
   const H=(t)=>`<div style="font-size:15px;font-weight:700;color:#5A4A42;margin:18px 0 6px;border-bottom:2px solid #FEE500;padding-bottom:4px">${t}</div>`;
   const nm=(m,i)=>esc(m.name||('팀원'+(i+1)));
-  let h=`<div style="font-family:'Malgun Gothic','Noto Sans KR',sans-serif;color:#2E2622;line-height:1.6">`;
+  let h=`<div style="font-family:'Kakao Small Sans','Malgun Gothic','Noto Sans KR',sans-serif;color:#2E2622;line-height:1.6">`;
   h+=`<div style="background:#3A2E28;color:#fff;border-radius:10px;padding:16px 18px;margin-bottom:8px">
       <div style="color:#E8712B;font-weight:700;font-size:13px">역방향 팀빌딩 전체 과정 · ${esc(st.teamName||'(팀명 미정)')} · ${esc(teamLabel)}</div>
       <div style="font-size:12px;color:#E4D3BE;margin:6px 0">세부내용 → ${esc(kw)} → 대주제 ${esc(th)} → 소주제 ${esc(st.subtopic||'—')} → 팀 주제</div>
