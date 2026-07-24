@@ -267,15 +267,21 @@ async function aiCall(task,payload){
 }
 /* ===== offline AI engine (fallback) ===== */
 const STOP=["그리고","하지만","그래서","때문","통해","위해","대한","대해","가장","정말","매우","너무","같은","같이","있는","없는","되는","하는","문제","해결","생각","부분","사람","우리","제주","지역","싶은","이유","관심","다양","여러","조금","많이","점점","더욱","위한","것을","것이","수가","때문에"];
-const LEX=["교통","이동","버스","대중교통","노선","차선","도로","주차","배차","접근성","통학","교통망","드론","환경","쓰레기","재활용","오염","탄소","탄소중립","친환경","에너지","재생에너지","기후","재난","해양","플라스틱","분리수거","관광","여행","체류","숙박","상권","자영업","창업","일자리","소상공인","물가","로컬","스마트팜","농업","경제","고령화","청년","유출","인구","돌봄","복지","의료","병원","교육","학교","정주","안전","사고","위험","시인성","방범","재해"];
+const LEX=["교통","이동","버스","대중교통","노선","차선","도로","주차","배차","접근성","통학","교통망","드론","환경","쓰레기","재활용","오염","탄소","탄소중립","친환경","에너지","재생에너지","기후","재난","해양","플라스틱","분리수거","관광","여행","체류","숙박","상권","자영업","창업","일자리","소상공인","물가","로컬","스마트팜","농업","경제","고령화","청년","유출","인구","돌봄","복지","의료","병원","교육","학교","정주","안전","사고","위험","시인성","방범","재해",
+  "서귀포","환승","정류장","정류소","렌터카","자가용","수요응답형","트램","공유자전거","전동킥보드","킥보드","택시","도보","읍면지역","시내버스","공항","정시성","이동수단","지도","카카오맵","배송","도서산간","배송비","신호","막차","교통혼잡","교통격차","불법주차","보행자","주차장","주차난","가로등","빗길","반사판","고휘도",
+  "고유가","기름값","배기가스","전기","트렌드",
+  "해양쓰레기","바다쓰레기","해안쓰레기","미세플라스틱","생태계","쓰레기통","수거","수거함","봉투","캠페인","자판기","포인트","보증금","컵보증제","청정제주","플로깅","해변","해수욕장","악취","유리병","환경정책","정책",
+  "여행객","한달살이","소비","관광객","관광산업","관광지","콘텐츠","프리미엄","맞춤형","브랜드","지속가능","체험","물가상승","저가형","수익성","경쟁력","항공료","항공권","항공편","저가항공",
+  "로컬기업","사업개발","폐공장","리모델링","산업시설","제조업","서비스업","고임금","청년사업자","취업","진로","수도권","보금자리",
+  "청년유출","소멸","지역소멸","고립","고립감","외로움","은둔","정착","이주","이주민","공동체","멘토링","정서","상담","소외","소속감","유대감","안전망"];
 const SYN={
-  이동성:["교통","이동","버스","대중교통","노선","DRT","배차","통학","접근성","교통망","주차","드론"],
-  도로안전:["차선","도로","안전","사고","시인성","위험","표지","재해"],
-  환경:["환경","쓰레기","재활용","오염","플라스틱","해양","분리수거"],
-  기후에너지:["탄소","탄소중립","친환경","에너지","재생에너지","기후","재난"],
-  관광체류:["관광","여행","체류","숙박","로컬"],
-  경제창업:["상권","자영업","창업","일자리","소상공인","물가","스마트팜","농업","경제"],
-  인구돌봄:["고령화","청년","유출","인구","돌봄","복지","정주"],
+  이동성:["교통","이동","버스","대중교통","노선","DRT","배차","통학","접근성","교통망","주차","드론","서귀포","환승","정류장","정류소","렌터카","자가용","수요응답형","트램","공유자전거","전동킥보드","킥보드","택시","도보","읍면지역","시내버스","공항","정시성","이동수단","지도","카카오맵","교통격차"],
+  도로안전:["차선","도로","안전","사고","시인성","위험","표지","재해","신호","막차","교통혼잡","불법주차","보행자","주차장","주차난","가로등","빗길","반사판","고휘도","배송","도서산간","배송비"],
+  환경:["환경","쓰레기","재활용","오염","플라스틱","해양","분리수거","해양쓰레기","바다쓰레기","해안쓰레기","미세플라스틱","생태계","쓰레기통","수거","수거함","봉투","캠페인","자판기","포인트","보증금","컵보증제","청정제주","플로깅","해변","해수욕장","악취","유리병","환경정책"],
+  기후에너지:["탄소","탄소중립","친환경","에너지","재생에너지","기후","재난","고유가","기름값","배기가스","전기","지속가능"],
+  관광체류:["관광","여행","체류","숙박","로컬","여행객","한달살이","소비","관광객","관광산업","관광지","콘텐츠","프리미엄","맞춤형","브랜드","체험","물가상승","저가형","수익성","경쟁력","트렌드"],
+  경제창업:["상권","자영업","창업","일자리","소상공인","물가","스마트팜","농업","경제","로컬기업","사업개발","폐공장","리모델링","산업시설","제조업","서비스업","고임금","청년사업자","취업","진로"],
+  인구돌봄:["고령화","청년","유출","인구","돌봄","복지","정주","청년유출","소멸","지역소멸","고립","고립감","외로움","은둔","정착","이주","이주민","공동체","멘토링","정서","상담","소외","소속감","유대감","안전망","수도권","보금자리","항공료","항공권","항공편","저가항공"],
   의료교육:["의료","병원","교육","학교"],
 };
 const CLUSTER_LABEL={이동성:"이동·교통 접근성",도로안전:"도로·이동 안전",환경:"환경·쓰레기",기후에너지:"기후·에너지",관광체류:"관광·체류",경제창업:"상권·창업",인구돌봄:"인구·돌봄",의료교육:"의료·교육"};
@@ -358,7 +364,7 @@ function nav(showBack=true,nextLabel="다음 단계 →"){
   return `<div class="navbtns">${back}${next}</div>`;
 }
 function go(d){clearTimer();state.step=Math.max(0,Math.min(STEPS.length-1,state.step+d));render();window.scrollTo({top:0,behavior:"smooth"});}
-function phead(i){const st=STEPS[i];return `<div class="phead"><div class="ptitle"><div class="badge">${i}</div><div><div class="sub">${st.t}</div><h2>${st.s}</h2></div></div></div>`}
+function phead(i){const st=STEPS[i];return `<div class="phead"><div class="ptitle"><div class="badge">${i}</div><div><div class="sub">${st.t}</div><h2>${st.s}</h2></div></div>${st.min?timerHTML(st.min):""}</div>`}
 
 /* ===== render root ===== */
 function render(){
@@ -573,10 +579,10 @@ function renderThemes(){const box=$("#themes");box.innerHTML="";
     d.innerHTML=`<div class="th" onclick="pickTheme('${t.key}')"><div class="tnum" style="background:${t.color}">${String(idx+1).padStart(2,"0")}</div>
       <h3>${t.key}${isRec?'<span class="tag ai">AI 추천</span>':''}${isWin?'<span class="tag win">최다</span>':''}</h3></div>
       <div class="sub-chips">${t.subs.map(s=>`<span>${s}</span>`).join("")}</div>
-      <textarea placeholder="우리 팀 키워드가 이 주제에 붙는 지점은…" oninput="state.themeNotes['${t.key}']=this.value">${esc(state.themeNotes[t.key])}</textarea>
+      <textarea placeholder="우리 팀 키워드가 이 주제에 연결되는 지점은…" oninput="state.themeNotes['${t.key}']=this.value">${esc(state.themeNotes[t.key])}</textarea>
       <div class="voterow"><span class="lbl">도트 투표</span><div class="vote"><button onclick="voteT('${t.key}',-1)">−</button><span class="cnt">${state.themeVotes[t.key]}</span><button onclick="voteT('${t.key}',1)">+</button></div>
       <span class="dots">${"●".repeat(Math.min(state.themeVotes[t.key],8))}</span>
-      <button class="btn ${on?'tan':'ghost'}" style="margin-left:auto;padding:7px 16px" onclick="pickTheme('${t.key}')">${on?'✓ 선정됨':'이 주제로 선정'}</button></div>`;
+      <button class="btn ${on?'tan':'ghost'}" style="margin-left:auto;padding:7px 16px" onclick="pickTheme('${t.key}')">${on?'✓ 선정됨':'이걸로 선정'}</button></div>`;
     box.appendChild(d);});}
 function voteT(k,d){state.themeVotes[k]=Math.max(0,state.themeVotes[k]+d);renderThemes();}
 function pickTheme(k){state.selectedTheme=k;if(!THEMES.find(t=>t.key===k).subs.includes(state.subtopic))state.subtopic="";renderThemes();}
@@ -604,7 +610,7 @@ function renderStep5(){
   view.innerHTML=`<div class="panel">${phead(5)}
     <div class="prompt"><b>진행 발문</b> &nbsp;팀명을 정하고, 소주제를 한 문장의 팀 주제로 만든 뒤 4명의 역할을 나누세요.</div>
     <label class="fl">팀명</label>
-    <input type="text" id="teamNameInput" placeholder="예: 제주 모빌리티 크루" value="${esc(state.teamName)}" oninput="state.teamName=this.value">
+    <input type="text" id="teamNameInput" placeholder="예: 링크 제주" value="${esc(state.teamName)}" oninput="state.teamName=this.value">
     <label class="fl" style="margin-top:16px">팀 주제 (한 문장)</label>
     <input type="text" id="teamTopicInput" placeholder='예: "AI 수요응답형 교통(DRT)과 안전 도로로 제주 교통 사각지대 해소"' value="${esc(state.teamTopic)}" oninput="state.teamTopic=this.value">
     <label class="fl" style="margin-top:16px">역할 · 지분 분배</label>
