@@ -358,7 +358,7 @@ function nav(showBack=true,nextLabel="다음 단계 →"){
   return `<div class="navbtns">${back}${next}</div>`;
 }
 function go(d){clearTimer();state.step=Math.max(0,Math.min(STEPS.length-1,state.step+d));render();window.scrollTo({top:0,behavior:"smooth"});}
-function phead(i){const st=STEPS[i];return `<div class="phead"><div class="ptitle"><div class="badge">${i}</div><div><div class="sub">${st.t}</div><h2>${st.s}</h2></div></div>${st.min?timerHTML(st.min):""}</div>`}
+function phead(i){const st=STEPS[i];return `<div class="phead"><div class="ptitle"><div class="badge">${i}</div><div><div class="sub">${st.t}</div><h2>${st.s}</h2></div></div></div>`}
 
 /* ===== render root ===== */
 function render(){
@@ -576,7 +576,7 @@ function renderThemes(){const box=$("#themes");box.innerHTML="";
       <textarea placeholder="우리 팀 키워드가 이 주제에 붙는 지점은…" oninput="state.themeNotes['${t.key}']=this.value">${esc(state.themeNotes[t.key])}</textarea>
       <div class="voterow"><span class="lbl">도트 투표</span><div class="vote"><button onclick="voteT('${t.key}',-1)">−</button><span class="cnt">${state.themeVotes[t.key]}</span><button onclick="voteT('${t.key}',1)">+</button></div>
       <span class="dots">${"●".repeat(Math.min(state.themeVotes[t.key],8))}</span>
-      <button class="btn ${on?'tan':'ghost'}" style="margin-left:auto;padding:7px 16px" onclick="pickTheme('${t.key}')">${on?'✓ 선정됨':'이걸로 선정'}</button></div>`;
+      <button class="btn ${on?'tan':'ghost'}" style="margin-left:auto;padding:7px 16px" onclick="pickTheme('${t.key}')">${on?'✓ 선정됨':'이 주제로 선정'}</button></div>`;
     box.appendChild(d);});}
 function voteT(k,d){state.themeVotes[k]=Math.max(0,state.themeVotes[k]+d);renderThemes();}
 function pickTheme(k){state.selectedTheme=k;if(!THEMES.find(t=>t.key===k).subs.includes(state.subtopic))state.subtopic="";renderThemes();}
