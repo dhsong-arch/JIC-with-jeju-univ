@@ -243,7 +243,7 @@ const THEMES=[
   {key:"기후위기",color:"#0A3B40",subs:["탄소중립","재난 안전","에너지"]},
 ];
 const CHECKS=["4명 모두 주제 안에 자기 지분이 있다","한 문장으로 설명할 수 있다","제주에서만 통하는 현장성이 있다","지금 당장 시작할 첫걸음이 있다","완벽함보다 진정성이 담겨 있다"];
-const STEPS=[{t:"시작",s:"안내"},{t:"STEP 1",s:"개인 공유",min:5},{t:"STEP 2",s:"키워드 도출",min:15},{t:"STEP 3",s:"대주제 선정",min:15},{t:"STEP 4",s:"소주제 재설정",min:10},{t:"STEP 5",s:"팀주제·팀명",min:10},{t:"결과",s:"확정·피치",min:15}];
+const STEPS=[{t:"시작",s:"안내"},{t:"STEP 1",s:"개인 공유",min:5},{t:"STEP 2",s:"키워드 도출",min:15},{t:"STEP 3",s:"대주제 선정",min:10},{t:"STEP 4",s:"소주제 재설정",min:5},{t:"STEP 5",s:"팀주제·팀명",min:10},{t:"결과",s:"확정·피치",min:5}];
 
 /* ===== 실제 AI(저비용 모델) 연결 =====
    USE_REMOTE_AI=true 이고 Supabase Edge Function 'ai-suggest' 가 배포돼 있으면
@@ -582,7 +582,7 @@ function renderThemes(){const box=$("#themes");box.innerHTML="";
       <textarea placeholder="우리 팀 키워드가 이 주제에 연결되는 지점은…" oninput="state.themeNotes['${t.key}']=this.value">${esc(state.themeNotes[t.key])}</textarea>
       <div class="voterow"><span class="lbl">도트 투표</span><div class="vote"><button onclick="voteT('${t.key}',-1)">−</button><span class="cnt">${state.themeVotes[t.key]}</span><button onclick="voteT('${t.key}',1)">+</button></div>
       <span class="dots">${"●".repeat(Math.min(state.themeVotes[t.key],8))}</span>
-      <button class="btn ${on?'tan':'ghost'}" style="margin-left:auto;padding:7px 16px" onclick="pickTheme('${t.key}')">${on?'✓ 선정됨':'이걸로 선정'}</button></div>`;
+      <button class="btn ${on?'tan':'ghost'}" style="margin-left:auto;padding:7px 16px" onclick="pickTheme('${t.key}')">${on?'✓ 선정됨':'이 주제로 선정'}</button></div>`;
     box.appendChild(d);});}
 function voteT(k,d){state.themeVotes[k]=Math.max(0,state.themeVotes[k]+d);renderThemes();}
 function pickTheme(k){state.selectedTheme=k;if(!THEMES.find(t=>t.key===k).subs.includes(state.subtopic))state.subtopic="";renderThemes();}
